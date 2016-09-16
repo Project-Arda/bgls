@@ -52,7 +52,7 @@ type AggSig struct {
 
 var g2 = new(bn256.G2).ScalarBaseMult(one)
 
-//KeyGen generates a SigningKey, VerifyKey and Authentication
+//KeyGen generates a SigningKey and VerifyKey
 func KeyGen() (*SigningKey, *VerifyKey, error) {
 	x, err := rand.Int(rand.Reader, bn256.Order)
 	if err != nil {
@@ -62,7 +62,7 @@ func KeyGen() (*SigningKey, *VerifyKey, error) {
 	return sk, vk, nil
 }
 
-//LoadKey turns secret key into SigninKey, VerifyKey and SelfSignature
+//LoadKey turns secret key into SigninKey and VerifyKey
 func LoadKey(x *big.Int) (*SigningKey, *VerifyKey) {
 	v := new(bn256.G2).ScalarBaseMult(x)
 	vk := &VerifyKey{v}
