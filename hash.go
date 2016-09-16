@@ -155,6 +155,7 @@ func hash(message []byte) (h1, h2 *big.Int) {
 
 //HashToCurve hashes an arbitrary byte array into a curve point on G1
 //uses 512bit output of blake2b to generate and combine two G1 points
+//implements http://www.di.ens.fr/~fouque/pub/latincrypt12.pdf for bn256
 func HashToCurve(message []byte) (*bn256.G1, bool) {
 	var h1, h2 = hash(message)
 	var p1, res1 = sw(h1)

@@ -4,7 +4,6 @@ Aggregate and Multi Signatures based on BGLS over BN256
 WIP / not for production use (in need of expert review/audit)
 
 ## Design
-The goal of this library is to create an efficient and secure ad hoc multi signature scheme. It relies on [bn256](https://godoc.org/golang.org/x/crypto/bn256) for curve and pairing operations. It implements hashing of arbitrary byte data to curve points, the standard BGLS scheme, and a custom multi signature scheme.
 
 ### Hashing
 The hashing algorithm is a direct implementation of [Indifferentiable Hashing to
@@ -57,6 +56,13 @@ BenchmarkVerification-8            10000            155311 ns/op
 PASS
 ok      golang.org/x/crypto/ed25519     5.894s
 ```
+
+## Future work
+- Use a faster pairing implementation. (ideally with gpu support for batch pairing)
+- Optimize bigint allocations in HashToCurve.
+- Add utility operations for serialization of keys/signatures.
+
+
 
 ## References
 - Dan Boneh, Craig Gentry, Ben Lynn, and Hovav Shacham. [Aggregate and verifiably encrypted signatures from bilinear maps](https://www.iacr.org/archive/eurocrypt2003/26560416/26560416.pdf)
