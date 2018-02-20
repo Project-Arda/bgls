@@ -108,13 +108,13 @@ func CheckAuthentication(v *VerifyKey, a *Authentication) bool {
 
 //Sign creates a signature on a message with a private key
 func (sk *SigningKey) Sign(m []byte) *Signature {
-	h, _ := HashToCurve(m)
+	h := Altbn_HashToCurve(m)
 	return &Signature{h.ScalarMult(h, sk.key)}
 }
 
 //Verify checks that a signature is valid
 func Verify(vk *VerifyKey, m []byte, sig *Signature) bool {
-	h, _ := HashToCurve(m)
+	h := Altbn_HashToCurve(m)
 	return pairEquals(bn256.Pair(h, vk.key), bn256.Pair(sig.sig, g2))
 }
 
@@ -134,10 +134,10 @@ func (a AggSig) Verify() bool {
 		return false
 	}
 	e1 := bn256.Pair(a.sig.sig, g2)
-	h, _ := HashToCurve(a.msgs[0])
+	h := Altbn_HashToCurve(a.msgs[0])
 	e2 := bn256.Pair(h, a.keys[0].key)
 	for i := 1; i < len(a.msgs); i++ {
-		h, _ = HashToCurve(a.msgs[i])
+		h = Altbn_HashToCurve(a.msgs[i])
 		e2.Add(e2, bn256.Pair(h, a.keys[i].key))
 	}
 	return pairEquals(e1, e2)
@@ -151,7 +151,7 @@ func (m MultiSig) Verify() bool {
 	for i := 1; i < len(m.keys); i++ {
 		vs.Add(vs, m.keys[i].key)
 	}
-	h, _ := HashToCurve(m.msg)
+	h := Altbn_HashToCurve(m.msg)
 	e2 := bn256.Pair(h, vs)
 	return pairEquals(e1, e2)
 }

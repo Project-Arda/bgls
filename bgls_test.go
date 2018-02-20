@@ -9,19 +9,62 @@ import (
 	"testing"
 )
 
-func TestHashToCurve(t *testing.T) {
+func TestAltBnHashToCurve(t *testing.T) {
+	N := 10
+	msgs := make([][]byte, N)
+	for i := 0; i < N; i++ {
+		msgs[i] = make([]byte, N)
+		_, _ = rand.Read(msgs[i])
+		x1, y1 := Altbn_sha3(msgs[i])
+		x2, y2 := Altbn_sha3(msgs[i])
+		if x1.Cmp(x2) != 0 || y1.Cmp(y2) != 0 {
+			t.Error("inconsistent results in altbn sha3 hash")
+		}
+
+		x1, y1 = Altbn_kang12(msgs[i])
+		x2, y2 = Altbn_kang12(msgs[i])
+		if x1.Cmp(x2) != 0 || y1.Cmp(y2) != 0 {
+			t.Error("inconsistent results in altbn kang12 hash")
+		}
+
+		x1, y1 = Altbn_blake2b(msgs[i])
+		x2, y2 = Altbn_blake2b(msgs[i])
+		if x1.Cmp(x2) != 0 || y1.Cmp(y2) != 0 {
+			t.Error("inconsistent results in altbn blake2b hash")
+		}
+
+		p1 := Altbn_HashToCurve(msgs[i])
+		p2 := Altbn_HashToCurve(msgs[i])
+		if !g1Equals(p1, p2) {
+			t.Error("inconsistent results in Altbn HashToCurve")
+		}
+	}
+}
+
+func TestBls12_sha3(t *testing.T) {
+	// Tests consistency
+	// TODO test correctness against known test cases.
 	N := 100
 	msgs := make([][]byte, N)
 	for i := 0; i < N; i++ {
 		msgs[i] = make([]byte, N)
 		_, _ = rand.Read(msgs[i])
-		h1, res1 := HashToCurve(msgs[i])
-		h2, res2 := HashToCurve(msgs[i])
-		if !res1 || !res2 {
-			t.Error("Hash to curve failure")
+		x1, x2 := Bls12_sha3(msgs[i])
+		y1, y2 := Bls12_sha3(msgs[i])
+		if x1.Cmp(y1) != 0 || x2.Cmp(y2) != 0 {
+			t.Error("inconsistent results in bls12 sha3 hash")
 		}
-		if !g1Equals(h1, h2) {
-			t.Error("inconsistent results in HashToCurve")
+
+		x1, x2 = Bls12_kang12(msgs[i])
+		y1, y2 = Bls12_kang12(msgs[i])
+		if x1.Cmp(y1) != 0 || x2.Cmp(y2) != 0 {
+			t.Error("inconsistent results in bls12 kang12 hash")
+		}
+
+		x1, x2 = Bls12_blake2b(msgs[i])
+		y1, y2 = Bls12_blake2b(msgs[i])
+		if x1.Cmp(y1) != 0 || x2.Cmp(y2) != 0 {
+			t.Error("inconsistent results in bls12 blake2b hash")
 		}
 	}
 }
@@ -55,7 +98,7 @@ func BenchmarkKeygen(b *testing.B) {
 	}
 }
 
-func BenchmarkHashToCurve(b *testing.B) {
+func BenchmarkAltBnHashToCurve(b *testing.B) {
 	ms := make([][]byte, b.N)
 	for i := 0; i < b.N; i++ {
 		ms[i] = make([]byte, 64)
@@ -63,7 +106,7 @@ func BenchmarkHashToCurve(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		HashToCurve(ms[i])
+		Altbn_sha3(ms[i])
 	}
 }
 
