@@ -1,10 +1,6 @@
 package bgls
 
 import (
-	//"crypto/rand"
-
-	//"golang.org/x/crypto/bn256"
-
 	"math/big"
 	"strconv"
 

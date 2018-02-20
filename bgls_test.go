@@ -5,6 +5,7 @@ package bgls
 
 import (
 	"crypto/rand"
+	"fmt"
 	"os"
 	"testing"
 )
@@ -86,6 +87,10 @@ func TestSingleSigner(t *testing.T) {
 	if !Verify(vk, d, sig) {
 		t.Error("Signature verification failed")
 	}
+	fmt.Println(sig.sig.Marshal())
+	h := Altbn_HashToCurve(d)
+	fmt.Println(h.Marshal())
+	fmt.Println(vk.key.Marshal())
 }
 
 func BenchmarkKeygen(b *testing.B) {
