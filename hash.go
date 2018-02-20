@@ -6,7 +6,7 @@ package bgls
 import (
 	"crypto/rand"
 
-	"golang.org/x/crypto/bn256"
+	"github.com/ethereum/go-ethereum/crypto/bn256"
 
 	"github.com/dchest/blake2b"
 
@@ -15,13 +15,13 @@ import (
 
 //curve specific constants
 var b = big.NewInt(3)
-var q, _ = new(big.Int).SetString("65000549695646603732796438742359905742825358107623003571877145026864184071783", 10)
+var q, _ = new(big.Int).SetString("21888242871839275222246405745257275088696311157297823662689037894645226208583", 10)
 
 //precomputed ζ = (-1 + sqrt(-3))/2 in Fq
-var ζ, _ = new(big.Int).SetString("4985783334309134261147736404674766913742361673560802634030", 10)
+var ζ, _ = new(big.Int).SetString("2203960485148121921418603742825762020974279258880205651966", 10)
 
 //precomputed sqrt(-3) in Fq
-var sqrtn3, _ = new(big.Int).SetString("9971566668618268522295472809349533827484723347121605268061", 10)
+var sqrtn3, _ = new(big.Int).SetString("4407920970296243842837207485651524041948558517760411303933", 10)
 
 var zero = big.NewInt(0)
 var one = big.NewInt(1)

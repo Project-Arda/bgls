@@ -10,7 +10,7 @@ import (
 
 	"math/big"
 
-	"golang.org/x/crypto/bn256"
+	"github.com/ethereum/go-ethereum/crypto/bn256"
 
 	"bytes"
 )

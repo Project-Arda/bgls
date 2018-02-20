@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"os"
 	"testing"
+	"fmt"
 )
 
 func TestHashToCurve(t *testing.T) {
@@ -43,6 +44,10 @@ func TestSingleSigner(t *testing.T) {
 	if !Verify(vk, d, sig) {
 		t.Error("Signature verification failed")
 	}
+	fmt.Println(sig.sig.Marshal())
+	h, _ := HashToCurve(d)
+	fmt.Println(h.Marshal())
+	fmt.Println(vk.key.Marshal())
 }
 
 func BenchmarkKeygen(b *testing.B) {
