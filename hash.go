@@ -13,7 +13,7 @@ var two = big.NewInt(2)
 var three = big.NewInt(3)
 var four = big.NewInt(4)
 
-func kang12(messageDat []byte) [64]byte {
+func kang12_64(messageDat []byte) [64]byte {
 	input_byte := make([]byte, 1)
 	hashFunc := K12.NewK12(input_byte)
 	hashFunc.Write(messageDat)
@@ -24,7 +24,7 @@ func kang12(messageDat []byte) [64]byte {
 	return x
 }
 
-func hash(message []byte, hashfunc func(message []byte) [64]byte, q *big.Int, xToYSqr func(x *big.Int) *big.Int) (px, py *big.Int) {
+func hash64(message []byte, hashfunc func(message []byte) [64]byte, q *big.Int, xToYSqr func(x *big.Int) *big.Int) (px, py *big.Int) {
 	c := 0
 	px = new(big.Int)
 	py = new(big.Int)
@@ -46,13 +46,35 @@ func hash(message []byte, hashfunc func(message []byte) [64]byte, q *big.Int, xT
 	return
 }
 
+func hash32(message []byte, hashfunc func(message []byte) [32]byte, q *big.Int, xToYSqr func(x *big.Int) *big.Int) (px, py *big.Int) {
+	c := 0
+	px = new(big.Int)
+	py = new(big.Int)
+	for {
+		h := hashfunc(append(message, byte(c)))
+		px.SetBytes(h[:32])
+		px.Mod(px, q)
+		ySqr := xToYSqr(px)
+		if isQuadRes(ySqr, q) == true {
+			py = calcQuadRes(ySqr, q)
+			sign_y := hashfunc(append(message, byte(255)))[31] % 2
+			if sign_y == 1 {
+				py.Sub(q, py)
+			}
+			break
+		}
+		c += 1
+	}
+	return
+}
+
 // Currently implementing first method from
 // http://mathworld.wolfram.com/QuadraticResidue.html
 func calcQuadRes(ySqr *big.Int, q *big.Int) *big.Int {
 	resMod4 := new(big.Int).Mod(q, four)
 	if resMod4.Cmp(three) == 0 {
 		k := new(big.Int).Sub(q, three)
-		k.Div(q, four)
+		k.Div(k, four)
 		exp := new(big.Int).Add(k, one)
 		result := new(big.Int)
 		result.Exp(ySqr, exp, q)

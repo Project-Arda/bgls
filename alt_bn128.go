@@ -8,6 +8,7 @@ import (
 
 	"github.com/dchest/blake2b"
 	"github.com/ethereum/go-ethereum/crypto/bn256"
+	gosha3 "github.com/ethereum/go-ethereum/crypto/sha3"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -24,17 +25,22 @@ var altbn_sqrtn3, _ = new(big.Int).SetString("4407920970296243842837207485651524
 // Note that the cofactor in this curve is just 1
 
 func Altbn_sha3(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash(message, sha3.Sum512, altbn_q, altbn_xToYSquared)
+	p1, p2 = hash64(message, sha3.Sum512, altbn_q, altbn_xToYSquared)
+	return
+}
+
+func Altbn_keccak3(message []byte) (p1, p2 *big.Int) {
+	p1, p2 = hash32(message, EthereumSum256, altbn_q, altbn_xToYSquared)
 	return
 }
 
 func Altbn_blake2b(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash(message, blake2b.Sum512, altbn_q, altbn_xToYSquared)
+	p1, p2 = hash64(message, blake2b.Sum512, altbn_q, altbn_xToYSquared)
 	return
 }
 
 func Altbn_kang12(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash(message, kang12, altbn_q, altbn_xToYSquared)
+	p1, p2 = hash64(message, kang12_64, altbn_q, altbn_xToYSquared)
 	return
 }
 
@@ -47,7 +53,7 @@ func altbn_xToYSquared(x *big.Int) *big.Int {
 
 //copied from bn256.G1.Marshal (modified)
 //copies points into []byte and unmarshals to get around curvePoint not being exported
-func mkAltBnPoint(x, y *big.Int) (*bn256.G1, bool) {
+func AltBnMkG1Point(x, y *big.Int) (*bn256.G1, bool) {
 	xBytes := x.Bytes()
 	yBytes := y.Bytes()
 	ret := make([]byte, 64)
@@ -56,8 +62,51 @@ func mkAltBnPoint(x, y *big.Int) (*bn256.G1, bool) {
 	return new(bn256.G1).Unmarshal(ret)
 }
 
+func AltBnMkG2Point(xx, xy, yx, yy *big.Int) (*bn256.G2, bool) {
+	xxBytes := xx.Bytes()
+	xyBytes := xy.Bytes()
+	yxBytes := yx.Bytes()
+	yyBytes := yy.Bytes()
+	ret := make([]byte, 128)
+	copy(ret[32-len(xxBytes):], xxBytes)
+	copy(ret[64-len(xyBytes):], xyBytes)
+	copy(ret[96-len(yxBytes):], yxBytes)
+	copy(ret[128-len(yyBytes):], yyBytes)
+	return new(bn256.G2).Unmarshal(ret)
+}
+
 func Altbn_HashToCurve(message []byte) *bn256.G1 {
-	x, y := Altbn_sha3(message)
-	p, _ := mkAltBnPoint(x, y)
+	x, y := Altbn_keccak3(message)
+	p, _ := AltBnMkG1Point(x, y)
 	return p
+}
+
+func AltBnG1ToCoord(pt *bn256.G1) (x, y *big.Int) {
+	Bytestream := pt.Marshal()
+	xBytes := Bytestream[:32]
+	yBytes := Bytestream[32:64]
+	x = new(big.Int).SetBytes(xBytes)
+	y = new(big.Int).SetBytes(yBytes)
+	return
+}
+
+func AltBnG2ToCoord(pt *bn256.G2) (xx, xy, yx, yy *big.Int) {
+	Bytestream := pt.Marshal()
+	xxBytes := Bytestream[:32]
+	xyBytes := Bytestream[32:64]
+	yxBytes := Bytestream[64:96]
+	yyBytes := Bytestream[96:128]
+	xx = new(big.Int).SetBytes(xxBytes)
+	xy = new(big.Int).SetBytes(xyBytes)
+	yx = new(big.Int).SetBytes(yxBytes)
+	yy = new(big.Int).SetBytes(yyBytes)
+	return
+}
+
+// Sum256 returns the SHA3-256 digest of the data.
+func EthereumSum256(data []byte) (digest [32]byte) {
+	h := gosha3.NewKeccak256()
+	h.Write(data)
+	h.Sum(digest[:0])
+	return
 }

@@ -50,6 +50,7 @@ type AggSig struct {
 	sig  *Signature
 }
 
+var g1 = new(bn256.G1).ScalarBaseMult(one)
 var g2 = new(bn256.G2).ScalarBaseMult(one)
 
 //KeyGen generates a SigningKey and VerifyKey

@@ -5,7 +5,7 @@ package bgls
 
 import (
 	"crypto/rand"
-	"fmt"
+	"math/big"
 	"os"
 	"testing"
 )
@@ -45,7 +45,7 @@ func TestAltBnHashToCurve(t *testing.T) {
 func TestBls12_sha3(t *testing.T) {
 	// Tests consistency
 	// TODO test correctness against known test cases.
-	N := 100
+	N := 10
 	msgs := make([][]byte, N)
 	for i := 0; i < N; i++ {
 		msgs[i] = make([]byte, N)
@@ -70,6 +70,21 @@ func TestBls12_sha3(t *testing.T) {
 	}
 }
 
+func TestEthereumHash(t *testing.T) {
+	a := []byte{116, 101, 115, 116}
+	x, y := Altbn_keccak3(a)
+	exp_x, _ := new(big.Int).SetString("634489172570043803084693618096875920319784881922983678883461805150451460743", 10)
+	exp_y, _ := new(big.Int).SetString("15164142362807052582232776116457640322025300091343369508144366426999358332749", 10)
+	if x.Cmp(exp_x) != 0 || y.Cmp(exp_y) != 0 {
+		t.Error("Hash does not match known Ethereum Output")
+	}
+	pt := Altbn_HashToCurve(a)
+	x2, y2 := AltBnG1ToCoord(pt)
+	if x.Cmp(x2) != 0 || y.Cmp(y2) != 0 {
+		t.Error("Conversion of point to coordinates is not working")
+	}
+}
+
 func TestSingleSigner(t *testing.T) {
 	sk, vk, err := KeyGen()
 	if err != nil {
@@ -87,11 +102,31 @@ func TestSingleSigner(t *testing.T) {
 	if !Verify(vk, d, sig) {
 		t.Error("Signature verification failed")
 	}
-	fmt.Println(sig.sig.Marshal())
-	h := Altbn_HashToCurve(d)
-	fmt.Println(h.Marshal())
-	fmt.Println(vk.key.Marshal())
+
+	sigTmp := copyg1(sig.sig)
+	sigTmp.Add(sigTmp, g1)
+	sig2 := &Signature{sigTmp}
+	if Verify(vk, d, sig2) {
+		t.Error("Signature verification succeeding when it shouldn't")
+	}
+
+	// TODO Add tests to show that this doesn't succeed if d or vk is altered
 }
+
+// func TestAltBnPairing(t *testing.T) {
+// 	N := 10
+// 	Size : = 32
+// 	msgs := make([][]byte, 2*N)
+// 	for i := 0; i < N; i++ {
+// 		msgs[i] = make([]byte, Size)
+// 		msgs[N+i] = make([]byte, Size)
+// 		_, _ = rand.Read(msgs[i])
+// 		_, _ = rand.Read(msgs[N+i])
+//
+// 		sk1, vk1, err1 := KeyGen()
+// 		sk2, vk2, err2 := KeyGen()
+// 	}
+// }
 
 func BenchmarkKeygen(b *testing.B) {
 	b.ResetTimer()
@@ -111,7 +146,7 @@ func BenchmarkAltBnHashToCurve(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		Altbn_sha3(ms[i])
+		Altbn_HashToCurve(ms[i])
 	}
 }
 
