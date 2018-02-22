@@ -54,8 +54,7 @@ func altbn_xToYSquared(x *big.Int) *big.Int {
 //copied from bn256.G1.Marshal (modified)
 //copies points into []byte and unmarshals to get around curvePoint not being exported
 func AltBnMkG1Point(x, y *big.Int) (*bn256.G1, bool) {
-	xBytes := x.Bytes()
-	yBytes := y.Bytes()
+	xBytes, yBytes := x.Bytes(), y.Bytes()
 	ret := make([]byte, 64)
 	copy(ret[32-len(xBytes):], xBytes)
 	copy(ret[64-len(yBytes):], yBytes)
@@ -63,10 +62,7 @@ func AltBnMkG1Point(x, y *big.Int) (*bn256.G1, bool) {
 }
 
 func AltBnMkG2Point(xx, xy, yx, yy *big.Int) (*bn256.G2, bool) {
-	xxBytes := xx.Bytes()
-	xyBytes := xy.Bytes()
-	yxBytes := yx.Bytes()
-	yyBytes := yy.Bytes()
+	xxBytes, xyBytes, yxBytes, yyBytes := xx.Bytes(), xy.Bytes(), yx.Bytes(), yy.Bytes()
 	ret := make([]byte, 128)
 	copy(ret[32-len(xxBytes):], xxBytes)
 	copy(ret[64-len(xyBytes):], xyBytes)
@@ -83,8 +79,7 @@ func Altbn_HashToCurve(message []byte) *bn256.G1 {
 
 func AltBnG1ToCoord(pt *bn256.G1) (x, y *big.Int) {
 	Bytestream := pt.Marshal()
-	xBytes := Bytestream[:32]
-	yBytes := Bytestream[32:64]
+	xBytes, yBytes := Bytestream[:32], Bytestream[32:64]
 	x = new(big.Int).SetBytes(xBytes)
 	y = new(big.Int).SetBytes(yBytes)
 	return
@@ -92,10 +87,7 @@ func AltBnG1ToCoord(pt *bn256.G1) (x, y *big.Int) {
 
 func AltBnG2ToCoord(pt *bn256.G2) (xx, xy, yx, yy *big.Int) {
 	Bytestream := pt.Marshal()
-	xxBytes := Bytestream[:32]
-	xyBytes := Bytestream[32:64]
-	yxBytes := Bytestream[64:96]
-	yyBytes := Bytestream[96:128]
+	xxBytes, xyBytes, yxBytes, yyBytes := Bytestream[:32], Bytestream[32:64], Bytestream[64:96], Bytestream[96:128]
 	xx = new(big.Int).SetBytes(xxBytes)
 	xy = new(big.Int).SetBytes(xyBytes)
 	yx = new(big.Int).SetBytes(yxBytes)

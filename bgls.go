@@ -129,30 +129,43 @@ func Aggregate(sigs []*Signature) *Signature {
 }
 
 //Verify checks that all messages were signed by associated keys
-//FIXME doesn't check for duplicated messages, insecure without key authentication
+// Will fail under duplicate messages
 func (a AggSig) Verify() bool {
-	if len(a.keys) != len(a.msgs) {
+	return VerifyAggregateSignature(a.sig, a.keys, a.msgs, false)
+}
+
+func VerifyAggregateSignature(aggsig *Signature, keys []*VerifyKey, msgs [][]byte, allowDuplicates bool) bool {
+	if len(keys) != len(msgs) {
 		return false
 	}
-	e1 := bn256.Pair(a.sig.sig, g2)
-	h := Altbn_HashToCurve(a.msgs[0])
-	e2 := bn256.Pair(h, a.keys[0].key)
-	for i := 1; i < len(a.msgs); i++ {
-		h = Altbn_HashToCurve(a.msgs[i])
-		e2.Add(e2, bn256.Pair(h, a.keys[i].key))
+	if !allowDuplicates {
+		if containsDuplicateMessage(msgs) {
+			return false
+		}
+	}
+	e1 := bn256.Pair(aggsig.sig, g2)
+	h := Altbn_HashToCurve(msgs[0])
+	e2 := bn256.Pair(h, keys[0].key)
+	for i := 1; i < len(msgs); i++ {
+		h = Altbn_HashToCurve(msgs[i])
+		e2.Add(e2, bn256.Pair(h, keys[i].key))
 	}
 	return pairEquals(e1, e2)
 }
 
 //Verify checks that a single message has been signed by a set of keys
-//insecure to chosen key attack, if keys have not been authenticated
+//vulnerable against chosen key attack, if keys have not been authenticated
 func (m MultiSig) Verify() bool {
-	e1 := bn256.Pair(m.sig.sig, g2)
-	vs := copyg2(m.keys[0].key)
-	for i := 1; i < len(m.keys); i++ {
-		vs.Add(vs, m.keys[i].key)
+	return VerifyMultiSignature(m.sig, m.keys, m.msg)
+}
+
+func VerifyMultiSignature(aggsig *Signature, keys []*VerifyKey, msg []byte) bool {
+	e1 := bn256.Pair(aggsig.sig, g2)
+	vs := copyg2(keys[0].key)
+	for i := 1; i < len(keys); i++ {
+		vs.Add(vs, keys[i].key)
 	}
-	h := Altbn_HashToCurve(m.msg)
+	h := Altbn_HashToCurve(msg)
 	e2 := bn256.Pair(h, vs)
 	return pairEquals(e1, e2)
 }
@@ -173,4 +186,17 @@ func copyg1(x *bn256.G1) *bn256.G1 {
 func copyg2(x *bn256.G2) *bn256.G2 {
 	p, _ := new(bn256.G2).Unmarshal(x.Marshal())
 	return p
+}
+
+func containsDuplicateMessage(msgs [][]byte) bool {
+	hashmap := make(map[string]bool)
+	for i := 0; i < len(msgs); i++ {
+		msg := string(msgs[i])
+		if _, ok := hashmap[msg]; !ok {
+			hashmap[msg] = true
+		} else {
+			return true
+		}
+	}
+	return false
 }

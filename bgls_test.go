@@ -16,23 +16,10 @@ func TestAltBnHashToCurve(t *testing.T) {
 	for i := 0; i < N; i++ {
 		msgs[i] = make([]byte, N)
 		_, _ = rand.Read(msgs[i])
-		x1, y1 := Altbn_sha3(msgs[i])
-		x2, y2 := Altbn_sha3(msgs[i])
-		if x1.Cmp(x2) != 0 || y1.Cmp(y2) != 0 {
-			t.Error("inconsistent results in altbn sha3 hash")
-		}
 
-		x1, y1 = Altbn_kang12(msgs[i])
-		x2, y2 = Altbn_kang12(msgs[i])
-		if x1.Cmp(x2) != 0 || y1.Cmp(y2) != 0 {
-			t.Error("inconsistent results in altbn kang12 hash")
-		}
-
-		x1, y1 = Altbn_blake2b(msgs[i])
-		x2, y2 = Altbn_blake2b(msgs[i])
-		if x1.Cmp(x2) != 0 || y1.Cmp(y2) != 0 {
-			t.Error("inconsistent results in altbn blake2b hash")
-		}
+		testHashConsistency(Altbn_sha3, "altbn sha3 hash", msgs[i], t)
+		testHashConsistency(Altbn_kang12, "altbn kang12 hash", msgs[i], t)
+		testHashConsistency(Altbn_blake2b, "altbn blake2b hash", msgs[i], t)
 
 		p1 := Altbn_HashToCurve(msgs[i])
 		p2 := Altbn_HashToCurve(msgs[i])
@@ -42,35 +29,29 @@ func TestAltBnHashToCurve(t *testing.T) {
 	}
 }
 
-func TestBls12_sha3(t *testing.T) {
+func TestBls12Hashing(t *testing.T) {
 	// Tests consistency
-	// TODO test correctness against known test cases.
 	N := 10
 	msgs := make([][]byte, N)
 	for i := 0; i < N; i++ {
 		msgs[i] = make([]byte, N)
 		_, _ = rand.Read(msgs[i])
-		x1, x2 := Bls12_sha3(msgs[i])
-		y1, y2 := Bls12_sha3(msgs[i])
-		if x1.Cmp(y1) != 0 || x2.Cmp(y2) != 0 {
-			t.Error("inconsistent results in bls12 sha3 hash")
-		}
+		testHashConsistency(Bls12_sha3, "bls12 sha3 hash", msgs[i], t)
+		testHashConsistency(Bls12_kang12, "bls12 kang12 hash", msgs[i], t)
+		testHashConsistency(Bls12_blake2b, "bls12 blake2b hash", msgs[i], t)
+	}
+}
 
-		x1, x2 = Bls12_kang12(msgs[i])
-		y1, y2 = Bls12_kang12(msgs[i])
-		if x1.Cmp(y1) != 0 || x2.Cmp(y2) != 0 {
-			t.Error("inconsistent results in bls12 kang12 hash")
-		}
-
-		x1, x2 = Bls12_blake2b(msgs[i])
-		y1, y2 = Bls12_blake2b(msgs[i])
-		if x1.Cmp(y1) != 0 || x2.Cmp(y2) != 0 {
-			t.Error("inconsistent results in bls12 blake2b hash")
-		}
+func testHashConsistency(hashFunc func(message []byte) (p1, p2 *big.Int), hashname string, msg []byte, t *testing.T) {
+	x1, y1 := hashFunc(msg)
+	x2, y2 := hashFunc(msg)
+	if x1.Cmp(x2) != 0 || y1.Cmp(y2) != 0 {
+		t.Error("inconsistent results in " + hashname)
 	}
 }
 
 func TestEthereumHash(t *testing.T) {
+	// Tests Altbn hash to curve against known solidity test case.
 	a := []byte{116, 101, 115, 116}
 	x, y := Altbn_keccak3(a)
 	exp_x, _ := new(big.Int).SetString("634489172570043803084693618096875920319784881922983678883461805150451460743", 10)
@@ -113,20 +94,80 @@ func TestSingleSigner(t *testing.T) {
 	// TODO Add tests to show that this doesn't succeed if d or vk is altered
 }
 
-// func TestAltBnPairing(t *testing.T) {
-// 	N := 10
-// 	Size : = 32
-// 	msgs := make([][]byte, 2*N)
-// 	for i := 0; i < N; i++ {
-// 		msgs[i] = make([]byte, Size)
-// 		msgs[N+i] = make([]byte, Size)
-// 		_, _ = rand.Read(msgs[i])
-// 		_, _ = rand.Read(msgs[N+i])
-//
-// 		sk1, vk1, err1 := KeyGen()
-// 		sk2, vk2, err2 := KeyGen()
-// 	}
-// }
+func TestAggregation(t *testing.T) {
+	N := 6
+	Size := 32
+	msgs := make([][]byte, N+1)
+	sigs := make([]*Signature, N+1)
+	pubkeys := make([]*VerifyKey, N+1)
+	for i := 0; i < N; i++ {
+		msgs[i] = make([]byte, Size)
+		_, _ = rand.Read(msgs[i])
+
+		sk, vk, _ := KeyGen()
+		sig := sk.Sign(msgs[i])
+		pubkeys[i] = vk
+		sigs[i] = sig
+	}
+	aggSig := Aggregate(sigs[:N])
+	if !VerifyAggregateSignature(aggSig, pubkeys[:N], msgs[:N], false) {
+		t.Error("Aggregate Signature verification failed")
+	}
+	if VerifyAggregateSignature(aggSig, pubkeys[:N-1], msgs[:N], false) {
+		t.Error("Aggregate Signature verification succeeding without enough pubkeys")
+	}
+	skf, vkf, _ := KeyGen()
+	pubkeys[N] = vkf
+	sigs[N] = skf.Sign(msgs[0])
+	msgs[N] = msgs[0]
+	aggSig = Aggregate(sigs)
+	if VerifyAggregateSignature(aggSig, pubkeys, msgs, false) {
+		t.Error("Aggregate Signature succeeding with duplicate messages with allow duplicates being false")
+	}
+	if !VerifyAggregateSignature(aggSig, pubkeys, msgs, true) {
+		t.Error("Aggregate Signature failing with duplicate messages with allow duplicates")
+	}
+	if VerifyAggregateSignature(aggSig, pubkeys[:N], msgs[:N], false) {
+		t.Error("Aggregate Signature succeeding with invalid signature")
+	}
+	msgs[0] = msgs[1]
+	msgs[1] = msgs[N]
+	aggSig = Aggregate(sigs[:N])
+	if VerifyAggregateSignature(aggSig, pubkeys[:N], msgs[:N], false) {
+		t.Error("Aggregate Signature succeeded with messages 0 and 1 switched")
+	}
+}
+
+func TestMultiSig(t *testing.T) {
+	Tests := 5
+	Size := 32
+	Signers := 10
+	for i := 0; i < Tests; i++ {
+		msg := make([]byte, Size)
+		_, _ = rand.Read(msg)
+		signers := make([]*VerifyKey, Signers)
+		sigs := make([]*Signature, Signers)
+		for j := 0; j < Signers; j++ {
+			sk, vk, _ := KeyGen()
+			sigs[j] = sk.Sign(msg)
+			signers[j] = vk
+		}
+		aggSig := Aggregate(sigs)
+		if !VerifyMultiSignature(aggSig, signers, msg) {
+			t.Error("Aggregate MultiSig verification failed")
+		}
+		msg2 := make([]byte, Size)
+		_, _ = rand.Read(msg2)
+		if VerifyMultiSignature(aggSig, signers, msg2) {
+			t.Error("Aggregate MultiSig verification succeeded on incorrect msg")
+		}
+		_, vkf, _ := KeyGen()
+		signers[0] = vkf
+		if VerifyMultiSignature(aggSig, signers, msg) {
+			t.Error("Aggregate MultiSig verification succeeded on incorrect signers")
+		}
+	}
+}
 
 func BenchmarkKeygen(b *testing.B) {
 	b.ResetTimer()
