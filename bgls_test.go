@@ -1,5 +1,5 @@
-// Copyright (C) 2016 Jeremiah Andrews
-// distributed under GNU GPLv3 license
+// Copyright (C) 2018 Authors
+// distributed under Apache 2.0 license
 
 package bgls
 

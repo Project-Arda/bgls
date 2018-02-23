@@ -11,21 +11,21 @@ The multi signature scheme is a modification of the BGLS scheme, where all signa
 
 ## Curves
 ### Alt bn128
-This curve is included because it is currently supported in the EVM.
 
-The group `G_1` is a cyclic group of prime order on the curve `Y^2 = X^3 + 3` defined over the field `F_p` with `p = 21888242871839275222246405745257275088696311157297823662689037894645226208583`, and with generator P1 = (1, 2). Since this curve is of prime order, every non-identity point is a generator, therefore the cofactor is 1.
+The group `G_1` is a cyclic group of prime order on the curve `Y^2 = X^3 + 3` defined over the field `F_p` with `p = 21888242871839275222246405745257275088696311157297823662689037894645226208583`.
 
-The group `G_2` is a cyclic group of non-prime order in the elliptic curve `Y^2 = X^3 + 3*((i + 9)^(-1))` over a different field `F_p^2 = F_p[X] / (X^2 + 1)` (p is the same as above). We can notate our irreducable element as `i`. The cofactor of this group is `21888242871839275222246405745257275088844257914179612981679871602714643921549`.
+The generator `g_1` is (1,2)
 
-The generator is `(11559732032986387107991004021392285783925812861821192530917403151452391805634i + 10857046999023057135944570762232829481370756359578518086990519993285655852781, 4082367875863433681332203403145435568316851327593401208105741076214120093531i + 8495653923123431417604973247489272438418190587263600148770280649306958101930)`
+Since this curve is of prime order, every non-identity point is a generator, therefore the cofactor is 1.
 
-### BLS12-381
-We plan on implementing this curve, because of its speed, and usage in Z-Cash.
+The group `G_2` is a cyclic subgroup of the non-prime order elliptic curve `Y^2 = X^3 + 3*((i + 9)^(-1))` over the field `F_p^2 = F_p[X] / (X^2 + 1)` (where p is the same as above). We can write our irreducible element as `i`. The cofactor of this group is `21888242871839275222246405745257275088844257914179612981679871602714643921549`.
+
+The generator `g_2` is defined as: `(11559732032986387107991004021392285783925812861821192530917403151452391805634*i + 10857046999023057135944570762232829481370756359578518086990519993285655852781, 4082367875863433681332203403145435568316851327593401208105741076214120093531*i + 8495653923123431417604973247489272438418190587263600148770280649306958101930)`
 
 ## Benchmarks
 The following benchmarks are from a 3.80GHz i7-7700HQ CPU with 16GB ram.
 
-For reference, the pairing operation (the slowest operation involved) takes ~18 milliseconds.
+For reference, the pairing operation (the slowest operation involved) takes ~12 milliseconds.
 ```
 $ go test golang.org/x/crypto/bn256 -bench .
 BenchmarkPairing-8   	     100	  12225545 ns/op
@@ -66,7 +66,7 @@ BenchmarkAggregateVerification-8   	     100	  15325182 ns/op
 PASS
 ok  	github.com/jlandrews/bgls	41.946s
 ```
-For comparison, the ed25519 implementation in go yields much faster key generation signing and single signature verification. At ~150 microseconds per verification, the multi signature verification is actually faster beyond ~500 signatures.
+For comparison, the ed25519 implementation in go yields much faster key generation signing and single signature verification. At ~145 microseconds per verification, the multi signature verification is actually faster beyond ~350 signatures.
 ```
 $ go test golang.org/x/crypto/ed25519 -bench .
 BenchmarkKeyGeneration-8   	   30000	     51878 ns/op
@@ -79,14 +79,13 @@ ok  	golang.org/x/crypto/ed25519	5.750s
 ### Hashing
 The hashing algorithm is currently try-and-increment, and we support SHA3, Kangaroo twelve, Keccak256, and Blake2b.
 
-We previously used a direct implementation of [Indifferentiable Hashing to Barreto–Naehrig Curves](http://www.di.ens.fr/~fouque/pub/latincrypt12.pdf) using blake2b, however this was removed because this can't be implemented in the EVM due to gas costs. This may be added back in.
+We previously used a direct implementation of [Indifferentiable Hashing to Barreto–Naehrig Curves](http://www.di.ens.fr/~fouque/pub/latincrypt12.pdf) using blake2b, however this was removed because this can't be implemented in the EVM due to gas costs, and will not work for BLS12-381.
 
 ## Future work
-- Use a faster pairing implementation. (ideally with gpu support for batch pairing)
 - Optimize bigint allocations.
 - Add utility operations for serialization of keys/signatures.
 - Implement a better Hashing algorithm, such as Elligator Squared
-- Write Go Bindings for the pairing operation of [BLS12-381](https://github.com/ebfull/pairing/tree/master/src/bls12_381), so we can use BLS12-381
+- Integrate [BLS12-381](https://github.com/ebfull/pairing/tree/master/src/bls12_381) with go bindings.
 - Abstract choice of curve in bgls.go
 
 ## References
