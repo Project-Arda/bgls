@@ -25,13 +25,12 @@ The generator `g_2` is defined as: `(1155973203298638710799100402139228578392581
 ## Benchmarks
 The following benchmarks are from a 3.80GHz i7-7700HQ CPU with 16GB ram.
 
-For reference, the pairing operation (the slowest operation involved) takes ~12 milliseconds.
+For reference, the pairing operation (the slowest operation involved) takes ~14 milliseconds.
 ```
-$ go test golang.org/x/crypto/bn256 -bench .
-BenchmarkPairing-8   	     100	  12225545 ns/op
+$ go test github.com/ethereum/go-ethereum/crypto/bn256 -bench .
+BenchmarkPairing-8   	     100	  13845045 ns/op
 PASS
-ok  	golang.org/x/crypto/bn256	1.462s
-
+ok  	github.com/ethereum/go-ethereum/crypto/bn256	1.842s
 ```
 - `Signing` ~2 milliseconds
 - `Signature verification` ~30 milliseconds, using two pairings.
