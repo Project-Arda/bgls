@@ -13,6 +13,7 @@ var two = big.NewInt(2)
 var three = big.NewInt(3)
 var four = big.NewInt(4)
 
+// 64 byte kangaroo twelve hash
 func kang12_64(messageDat []byte) [64]byte {
 	input_byte := make([]byte, 1)
 	hashFunc := K12.NewK12(input_byte)
@@ -24,6 +25,7 @@ func kang12_64(messageDat []byte) [64]byte {
 	return x
 }
 
+// 64 byte hash
 func hash64(message []byte, hashfunc func(message []byte) [64]byte, q *big.Int, xToYSqr func(x *big.Int) *big.Int) (px, py *big.Int) {
 	c := 0
 	px = new(big.Int)
@@ -46,6 +48,7 @@ func hash64(message []byte, hashfunc func(message []byte) [64]byte, q *big.Int, 
 	return
 }
 
+// 32 byte hash which complies with standards we are using in the solidity contract.
 func hash32(message []byte, hashfunc func(message []byte) [32]byte, q *big.Int, xToYSqr func(x *big.Int) *big.Int) (px, py *big.Int) {
 	c := 0
 	px = new(big.Int)
