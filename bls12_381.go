@@ -23,19 +23,19 @@ func makeBls12Cofactor(x *big.Int) *big.Int {
 
 func Bls12_sha3(message []byte) (p1, p2 *big.Int) {
 	// TODO ADD COFACTOR MULTIPLICATION
-	p1, p2 = hash(message, sha3.Sum512, bls12_q, bls12_xToYSquared)
+	p1, p2 = hash64(message, sha3.Sum512, bls12_q, bls12_xToYSquared)
 	return
 }
 
 func Bls12_blake2b(message []byte) (p1, p2 *big.Int) {
 	// TODO ADD COFACTOR MULTIPLICATION
-	p1, p2 = hash(message, blake2b.Sum512, bls12_q, bls12_xToYSquared)
+	p1, p2 = hash64(message, blake2b.Sum512, bls12_q, bls12_xToYSquared)
 	return
 }
 
 func Bls12_kang12(message []byte) (p1, p2 *big.Int) {
 	// TODO ADD COFACTOR MULTIPLICATION
-	p1, p2 = hash(message, kang12, bls12_q, bls12_xToYSquared)
+	p1, p2 = hash64(message, kang12_64, bls12_q, bls12_xToYSquared)
 	return
 }
 
