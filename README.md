@@ -1,22 +1,19 @@
 # BGLS
-Aggregate and Multi Signatures based on BGLS over Altbn 128
+Aggregate and Multi Signatures based on BGLS over Alt bn128
 
 This library provides no security against side channel attacks. We provide no security guarantees of this implementation.
 
 ## Design
-The goal of this library is to create an efficient and secure ad hoc aggregate and multi signature scheme. It relies on [altbn 128](https://github.com/ethereum/go-ethereum/tree/master/crypto/bn256) for curve and pairing operations. It implements hashing of arbitrary byte data to curve points, the standard BGLS scheme for aggregate signatures, and a custom multi signature scheme.
+The goal of this library is to create an efficient and secure ad hoc aggregate and multi signature scheme. It relies on [alt bn128](https://github.com/ethereum/go-ethereum/tree/master/crypto/bn256) for curve and pairing operations. It implements hashing of arbitrary byte data to curve points, the standard BGLS scheme for aggregate signatures, and a custom multi signature scheme.
 
 ### Multi Signature
 The multi signature scheme is a modification of the BGLS scheme, where all signatures are on the same message. This allows verification with a constant number of pairing operations, at the cost of being insecure to chosen key attacks. To fix the chosen key attack, users are required to prove knowledge of their secret key, through the use of the Schnorr scheme applied to their public key.
 
 ## Curves
-### Altbn 128
+### Alt bn128
 This curve is included because it is currently supported in the EVM.
 
-The groups `G_1` and `G_1` are cyclic groups on the elliptic curve alt_bn128 defined by the curve equation
-`Y^2 = X^3 + 3`
-
-The group `G_1` is a cyclic group of prime order on the above curve over the field `F_p` with `p = 21888242871839275222246405745257275088696311157297823662689037894645226208583`, and with generator P1 = (1, 2). Since this curve is of prime order, every non-identity point is a generator, therefore the cofactor is 1.
+The group `G_1` is a cyclic group of prime order on the curve `Y^2 = X^3 + 3` defined over the field `F_p` with `p = 21888242871839275222246405745257275088696311157297823662689037894645226208583`, and with generator P1 = (1, 2). Since this curve is of prime order, every non-identity point is a generator, therefore the cofactor is 1.
 
 The group `G_2` is a cyclic group of non-prime order in the elliptic curve `Y^2 = X^3 + 3*((i + 9)^(-1))` over a different field `F_p^2 = F_p[X] / (X^2 + 1)` (p is the same as above). We can notate our irreducable element as `i`. The cofactor of this group is `21888242871839275222246405745257275088844257914179612981679871602714643921549`.
 
