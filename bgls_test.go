@@ -1,5 +1,5 @@
-// Copyright (C) 2016 Jeremiah Andrews
-// distributed under GNU GPLv3 license
+// Copyright (C) 2018 Authors
+// distributed under Apache 2.0 license
 
 package bgls
 
@@ -17,12 +17,12 @@ func TestAltbnHashToCurve(t *testing.T) {
 		msgs[i] = make([]byte, N)
 		_, _ = rand.Read(msgs[i])
 
-		testHashConsistency(Altbn_sha3, "altbn sha3 hash", msgs[i], t)
-		testHashConsistency(Altbn_kang12, "altbn kang12 hash", msgs[i], t)
-		testHashConsistency(Altbn_blake2b, "altbn blake2b hash", msgs[i], t)
+		testHashConsistency(AltbnSha3, "altbn sha3 hash", msgs[i], t)
+		testHashConsistency(AltbnKang12, "altbn kang12 hash", msgs[i], t)
+		testHashConsistency(AltbnBlake2b, "altbn blake2b hash", msgs[i], t)
 
-		p1 := Altbn_HashToCurve(msgs[i])
-		p2 := Altbn_HashToCurve(msgs[i])
+		p1 := AltbnHashToCurve(msgs[i])
+		p2 := AltbnHashToCurve(msgs[i])
 		if !g1Equals(p1, p2) {
 			t.Error("inconsistent results in Altbn HashToCurve")
 		}
@@ -36,9 +36,9 @@ func TestBls12Hashing(t *testing.T) {
 	for i := 0; i < N; i++ {
 		msgs[i] = make([]byte, N)
 		_, _ = rand.Read(msgs[i])
-		testHashConsistency(Bls12_sha3, "bls12 sha3 hash", msgs[i], t)
-		testHashConsistency(Bls12_kang12, "bls12 kang12 hash", msgs[i], t)
-		testHashConsistency(Bls12_blake2b, "bls12 blake2b hash", msgs[i], t)
+		testHashConsistency(Bls12Sha3, "bls12 sha3 hash", msgs[i], t)
+		testHashConsistency(Bls12Kang12, "bls12 kang12 hash", msgs[i], t)
+		testHashConsistency(Bls12Blake2b, "bls12 blake2b hash", msgs[i], t)
 	}
 }
 
@@ -53,14 +53,14 @@ func testHashConsistency(hashFunc func(message []byte) (p1, p2 *big.Int), hashna
 func TestEthereumHash(t *testing.T) {
 	// Tests Altbn hash to curve against known solidity test case.
 	a := []byte{116, 101, 115, 116}
-	x, y := Altbn_keccak3(a)
-	exp_x, _ := new(big.Int).SetString("634489172570043803084693618096875920319784881922983678883461805150451460743", 10)
-	exp_y, _ := new(big.Int).SetString("15164142362807052582232776116457640322025300091343369508144366426999358332749", 10)
-	if x.Cmp(exp_x) != 0 || y.Cmp(exp_y) != 0 {
+	x, y := AltbnKeccak3(a)
+	expX, _ := new(big.Int).SetString("634489172570043803084693618096875920319784881922983678883461805150451460743", 10)
+	expY, _ := new(big.Int).SetString("15164142362807052582232776116457640322025300091343369508144366426999358332749", 10)
+	if x.Cmp(expX) != 0 || y.Cmp(expY) != 0 {
 		t.Error("Hash does not match known Ethereum Output")
 	}
-	pt := Altbn_HashToCurve(a)
-	x2, y2 := Altbn_G1ToCoord(pt)
+	pt := AltbnHashToCurve(a)
+	x2, y2 := AltbnG1ToCoord(pt)
 	if x.Cmp(x2) != 0 || y.Cmp(y2) != 0 {
 		t.Error("Conversion of point to coordinates is not working")
 	}
@@ -187,7 +187,7 @@ func BenchmarkAltBnHashToCurve(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		Altbn_HashToCurve(ms[i])
+		AltbnHashToCurve(ms[i])
 	}
 }
 
