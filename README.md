@@ -86,6 +86,8 @@ We previously used a direct implementation of [Indifferentiable Hashing to Barre
 - Implement a better Hashing algorithm, such as Elligator Squared
 - Integrate [BLS12-381](https://github.com/ebfull/pairing/tree/master/src/bls12_381) with go bindings.
 - Abstract choice of curve in bgls.go
+- Integrations with [bgls-on-evm](https://github.com/jlandrews/bgls-on-evm)
+- More complete usage documentation
 
 ## References
 - Dan Boneh, Craig Gentry, Ben Lynn, and Hovav Shacham. [Aggregate and verifiably encrypted signatures from bilinear maps](https://www.iacr.org/archive/eurocrypt2003/26560416/26560416.pdf)
