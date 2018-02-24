@@ -109,17 +109,17 @@ func CheckAuthentication(v *VerifyKey, a *Authentication) bool {
 
 //Sign creates a signature on a message with a private key
 func (sk *SigningKey) Sign(m []byte) *Signature {
-	h := Altbn_HashToCurve(m)
+	h := AltbnHashToCurve(m)
 	return &Signature{h.ScalarMult(h, sk.key)}
 }
 
-//Verify checks that a signature is valid
+// Verify checks that a signature is valid
 func Verify(vk *VerifyKey, m []byte, sig *Signature) bool {
-	h := Altbn_HashToCurve(m)
+	h := AltbnHashToCurve(m)
 	return pairEquals(bn256.Pair(h, vk.key), bn256.Pair(sig.sig, g2))
 }
 
-//Aggregate turns a set of signatures into a single signature
+// Aggregate turns a set of signatures into a single signature
 func Aggregate(sigs []*Signature) *Signature {
 	a := copyg1(sigs[0].sig)
 	for _, s := range sigs[1:] {
@@ -128,12 +128,14 @@ func Aggregate(sigs []*Signature) *Signature {
 	return &Signature{a}
 }
 
-//Verify checks that all messages were signed by associated keys
+// Verify checks that all messages were signed by associated keys
 // Will fail under duplicate messages
 func (a AggSig) Verify() bool {
 	return VerifyAggregateSignature(a.sig, a.keys, a.msgs, false)
 }
 
+// VerifyAggregateSignature verifies that the aggregated signature proves that all messages were signed by associated keys
+// Will fail under duplicate messages, unless allow duplicates is True.
 func VerifyAggregateSignature(aggsig *Signature, keys []*VerifyKey, msgs [][]byte, allowDuplicates bool) bool {
 	if len(keys) != len(msgs) {
 		return false
@@ -144,10 +146,10 @@ func VerifyAggregateSignature(aggsig *Signature, keys []*VerifyKey, msgs [][]byt
 		}
 	}
 	e1 := bn256.Pair(aggsig.sig, g2)
-	h := Altbn_HashToCurve(msgs[0])
+	h := AltbnHashToCurve(msgs[0])
 	e2 := bn256.Pair(h, keys[0].key)
 	for i := 1; i < len(msgs); i++ {
-		h = Altbn_HashToCurve(msgs[i])
+		h = AltbnHashToCurve(msgs[i])
 		e2.Add(e2, bn256.Pair(h, keys[i].key))
 	}
 	return pairEquals(e1, e2)
@@ -159,13 +161,15 @@ func (m MultiSig) Verify() bool {
 	return VerifyMultiSignature(m.sig, m.keys, m.msg)
 }
 
+// VerifyMultiSignature checks that the aggregate signature correctly proves that a single message has been signed by a set of keys,
+// vulnerable against chosen key attack, if keys have not been authenticated
 func VerifyMultiSignature(aggsig *Signature, keys []*VerifyKey, msg []byte) bool {
 	e1 := bn256.Pair(aggsig.sig, g2)
 	vs := copyg2(keys[0].key)
 	for i := 1; i < len(keys); i++ {
 		vs.Add(vs, keys[i].key)
 	}
-	h := Altbn_HashToCurve(msg)
+	h := AltbnHashToCurve(msg)
 	e2 := bn256.Pair(h, vs)
 	return pairEquals(e1, e2)
 }

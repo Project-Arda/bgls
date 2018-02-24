@@ -18,8 +18,8 @@ var four = big.NewInt(4)
 
 // 64 byte kangaroo twelve hash
 func kang12_64(messageDat []byte) [64]byte {
-	input_byte := make([]byte, 1)
-	hashFunc := K12.NewK12(input_byte)
+	inputByte := make([]byte, 1)
+	hashFunc := K12.NewK12(inputByte)
 	hashFunc.Write(messageDat)
 	out := make([]byte, 64)
 	hashFunc.Read(out)
@@ -40,13 +40,13 @@ func hash64(message []byte, hashfunc func(message []byte) [64]byte, q *big.Int, 
 		ySqr := xToYSqr(px)
 		if isQuadRes(ySqr, q) == true {
 			py = calcQuadRes(ySqr, q)
-			sign_y := int(h[48]) % 2
-			if sign_y == 1 {
+			signY := int(h[48]) % 2
+			if signY == 1 {
 				py.Sub(q, py)
 			}
 			break
 		}
-		c += 1
+		c++
 	}
 	return
 }
@@ -63,13 +63,13 @@ func hash32(message []byte, hashfunc func(message []byte) [32]byte, q *big.Int, 
 		ySqr := xToYSqr(px)
 		if isQuadRes(ySqr, q) == true {
 			py = calcQuadRes(ySqr, q)
-			sign_y := hashfunc(append(message, byte(255)))[31] % 2
-			if sign_y == 1 {
+			signY := hashfunc(append(message, byte(255)))[31] % 2
+			if signY == 1 {
 				py.Sub(q, py)
 			}
 			break
 		}
-		c += 1
+		c++
 	}
 	return
 }
