@@ -1,5 +1,5 @@
-// Copyright (C) 2016 Jeremiah Andrews
-// distributed under GNU GPLv3 license
+// Copyright (C) 2018 Authors
+// distributed under Apache 2.0 license
 
 package bgls
 
@@ -10,7 +10,7 @@ import (
 
 	"math/big"
 
-	"golang.org/x/crypto/bn256"
+	"github.com/ethereum/go-ethereum/crypto/bn256"
 
 	"bytes"
 )
@@ -50,6 +50,7 @@ type AggSig struct {
 	sig  *Signature
 }
 
+var g1 = new(bn256.G1).ScalarBaseMult(one)
 var g2 = new(bn256.G2).ScalarBaseMult(one)
 
 //KeyGen generates a SigningKey and VerifyKey
@@ -108,17 +109,17 @@ func CheckAuthentication(v *VerifyKey, a *Authentication) bool {
 
 //Sign creates a signature on a message with a private key
 func (sk *SigningKey) Sign(m []byte) *Signature {
-	h, _ := HashToCurve(m)
+	h := AltbnHashToCurve(m)
 	return &Signature{h.ScalarMult(h, sk.key)}
 }
 
-//Verify checks that a signature is valid
+// Verify checks that a signature is valid
 func Verify(vk *VerifyKey, m []byte, sig *Signature) bool {
-	h, _ := HashToCurve(m)
+	h := AltbnHashToCurve(m)
 	return pairEquals(bn256.Pair(h, vk.key), bn256.Pair(sig.sig, g2))
 }
 
-//Aggregate turns a set of signatures into a single signature
+// Aggregate turns a set of signatures into a single signature
 func Aggregate(sigs []*Signature) *Signature {
 	a := copyg1(sigs[0].sig)
 	for _, s := range sigs[1:] {
@@ -127,31 +128,48 @@ func Aggregate(sigs []*Signature) *Signature {
 	return &Signature{a}
 }
 
-//Verify checks that all messages were signed by associated keys
-//FIXME doesn't check for duplicated messages, insecure without key authentication
+// Verify checks that all messages were signed by associated keys
+// Will fail under duplicate messages
 func (a AggSig) Verify() bool {
-	if len(a.keys) != len(a.msgs) {
+	return VerifyAggregateSignature(a.sig, a.keys, a.msgs, false)
+}
+
+// VerifyAggregateSignature verifies that the aggregated signature proves that all messages were signed by associated keys
+// Will fail under duplicate messages, unless allow duplicates is True.
+func VerifyAggregateSignature(aggsig *Signature, keys []*VerifyKey, msgs [][]byte, allowDuplicates bool) bool {
+	if len(keys) != len(msgs) {
 		return false
 	}
-	e1 := bn256.Pair(a.sig.sig, g2)
-	h, _ := HashToCurve(a.msgs[0])
-	e2 := bn256.Pair(h, a.keys[0].key)
-	for i := 1; i < len(a.msgs); i++ {
-		h, _ = HashToCurve(a.msgs[i])
-		e2.Add(e2, bn256.Pair(h, a.keys[i].key))
+	if !allowDuplicates {
+		if containsDuplicateMessage(msgs) {
+			return false
+		}
+	}
+	e1 := bn256.Pair(aggsig.sig, g2)
+	h := AltbnHashToCurve(msgs[0])
+	e2 := bn256.Pair(h, keys[0].key)
+	for i := 1; i < len(msgs); i++ {
+		h = AltbnHashToCurve(msgs[i])
+		e2.Add(e2, bn256.Pair(h, keys[i].key))
 	}
 	return pairEquals(e1, e2)
 }
 
 //Verify checks that a single message has been signed by a set of keys
-//insecure to chosen key attack, if keys have not been authenticated
+//vulnerable against chosen key attack, if keys have not been authenticated
 func (m MultiSig) Verify() bool {
-	e1 := bn256.Pair(m.sig.sig, g2)
-	vs := copyg2(m.keys[0].key)
-	for i := 1; i < len(m.keys); i++ {
-		vs.Add(vs, m.keys[i].key)
+	return VerifyMultiSignature(m.sig, m.keys, m.msg)
+}
+
+// VerifyMultiSignature checks that the aggregate signature correctly proves that a single message has been signed by a set of keys,
+// vulnerable against chosen key attack, if keys have not been authenticated
+func VerifyMultiSignature(aggsig *Signature, keys []*VerifyKey, msg []byte) bool {
+	e1 := bn256.Pair(aggsig.sig, g2)
+	vs := copyg2(keys[0].key)
+	for i := 1; i < len(keys); i++ {
+		vs.Add(vs, keys[i].key)
 	}
-	h, _ := HashToCurve(m.msg)
+	h := AltbnHashToCurve(msg)
 	e2 := bn256.Pair(h, vs)
 	return pairEquals(e1, e2)
 }
@@ -172,4 +190,17 @@ func copyg1(x *bn256.G1) *bn256.G1 {
 func copyg2(x *bn256.G2) *bn256.G2 {
 	p, _ := new(bn256.G2).Unmarshal(x.Marshal())
 	return p
+}
+
+func containsDuplicateMessage(msgs [][]byte) bool {
+	hashmap := make(map[string]bool)
+	for i := 0; i < len(msgs); i++ {
+		msg := string(msgs[i])
+		if _, ok := hashmap[msg]; !ok {
+			hashmap[msg] = true
+		} else {
+			return true
+		}
+	}
+	return false
 }
