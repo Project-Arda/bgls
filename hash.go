@@ -29,15 +29,16 @@ func kang12_64(messageDat []byte) [64]byte {
 }
 
 // 64 byte hash
-func hash64(message []byte, hashfunc func(message []byte) [64]byte, q *big.Int, xToYSqr func(x *big.Int) *big.Int) (px, py *big.Int) {
+func hash64(message []byte, hashfunc func(message []byte) [64]byte, curve CurveSystem) (px, py *big.Int) {
 	c := 0
 	px = new(big.Int)
 	py = new(big.Int)
+	q := curve.getG1Q()
 	for {
 		h := hashfunc(append(message, strconv.Itoa(c)...))
 		px.SetBytes(h[:48])
 		px.Mod(px, q)
-		ySqr := xToYSqr(px)
+		ySqr := curve.g1XToYSquared(px)
 		if isQuadRes(ySqr, q) == true {
 			py = calcQuadRes(ySqr, q)
 			signY := int(h[48]) % 2
@@ -52,15 +53,16 @@ func hash64(message []byte, hashfunc func(message []byte) [64]byte, q *big.Int, 
 }
 
 // 32 byte hash which complies with standards we are using in the solidity contract.
-func hash32(message []byte, hashfunc func(message []byte) [32]byte, q *big.Int, xToYSqr func(x *big.Int) *big.Int) (px, py *big.Int) {
+func hash32(message []byte, hashfunc func(message []byte) [32]byte, curve CurveSystem) (px, py *big.Int) {
 	c := 0
 	px = new(big.Int)
 	py = new(big.Int)
+	q := curve.getG1Q()
 	for {
 		h := hashfunc(append(message, byte(c)))
 		px.SetBytes(h[:32])
 		px.Mod(px, q)
-		ySqr := xToYSqr(px)
+		ySqr := curve.g1XToYSquared(px)
 		if isQuadRes(ySqr, q) == true {
 			py = calcQuadRes(ySqr, q)
 			signY := hashfunc(append(message, byte(255)))[31] % 2
