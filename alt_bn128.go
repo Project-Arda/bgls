@@ -28,8 +28,12 @@ type altBn128PointT struct {
 	point *bn256.GT
 }
 
-func (pt *altBn128Point1) g1ToAffineCoords() (x, y *big.Int) {
-	Bytestream := pt.point.Marshal()
+func (curve altBn128) g1ToAffineCoords(pt Point1) (x, y *big.Int) {
+	p1, ok1 := (pt).(*altBn128Point1)
+	if !ok1 {
+		return nil, nil
+	}
+	Bytestream := p1.point.Marshal()
 	xBytes, yBytes := Bytestream[:32], Bytestream[32:64]
 	x = new(big.Int).SetBytes(xBytes)
 	y = new(big.Int).SetBytes(yBytes)

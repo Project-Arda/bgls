@@ -62,7 +62,7 @@ func TestEthereumHash(t *testing.T) {
 		t.Error("Hash does not match known Ethereum Output")
 	}
 	pt := curve.HashToG1(a)
-	x2, y2 := pt.g1ToAffineCoords()
+	x2, y2 := curve.g1ToAffineCoords(pt)
 	if x.Cmp(x2) != 0 || y.Cmp(y2) != 0 {
 		t.Error("Conversion of point to coordinates is not working")
 	}
