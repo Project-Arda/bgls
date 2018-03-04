@@ -11,7 +11,7 @@ import (
 )
 
 func TestAltbnHashToCurve(t *testing.T) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	N := 10
 	msgs := make([][]byte, N)
 	for i := 0; i < N; i++ {
@@ -52,7 +52,7 @@ func testHashConsistency(hashFunc func(message []byte) (p1, p2 *big.Int), hashna
 }
 
 func TestEthereumHash(t *testing.T) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	// Tests Altbn hash to curve against known solidity test case.
 	a := []byte{116, 101, 115, 116}
 	x, y := AltbnKeccak3(a)
@@ -69,7 +69,7 @@ func TestEthereumHash(t *testing.T) {
 }
 
 func TestSingleSigner(t *testing.T) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	sk, vk, err := KeyGen(curve)
 	if err != nil {
 		t.Error("Key generation failed")
@@ -98,7 +98,7 @@ func TestSingleSigner(t *testing.T) {
 }
 
 func TestAggregation(t *testing.T) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	N := 6
 	Size := 32
 	msgs := make([][]byte, N+1)
@@ -145,7 +145,7 @@ func TestAggregation(t *testing.T) {
 }
 
 func TestMultiSig(t *testing.T) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	Tests := 5
 	Size := 32
 	Signers := 10
@@ -178,7 +178,7 @@ func TestMultiSig(t *testing.T) {
 
 func BenchmarkKeygen(b *testing.B) {
 	b.ResetTimer()
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	for i := 0; i < b.N; i++ {
 		_, _, res := KeyGen(curve)
 		if res != nil {
@@ -188,7 +188,7 @@ func BenchmarkKeygen(b *testing.B) {
 }
 
 func BenchmarkAltBnHashToCurve(b *testing.B) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	ms := make([][]byte, b.N)
 	for i := 0; i < b.N; i++ {
 		ms[i] = make([]byte, 64)
@@ -201,7 +201,7 @@ func BenchmarkAltBnHashToCurve(b *testing.B) {
 }
 
 func BenchmarkSigning(b *testing.B) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	sks := make([]SigningKey, b.N)
 	ms := make([][]byte, b.N)
 	for i := 0; i < b.N; i++ {
@@ -217,7 +217,7 @@ func BenchmarkSigning(b *testing.B) {
 }
 
 func BenchmarkVerification(b *testing.B) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	message := make([]byte, 64)
 	_, _ = rand.Read(message)
 	sk, vk, _ := KeyGen(curve)
@@ -235,7 +235,7 @@ var sgs []Signature
 var msg []byte
 
 func TestMain(m *testing.M) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	vks = make([]VerifyKey, 2048)
 	sgs = make([]Signature, 2048)
 	msg = make([]byte, 64)
@@ -249,7 +249,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestKnownCases(t *testing.T) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	N := 3
 	msgs := make([][]byte, N)
 	msg1 := []byte{65, 20, 86, 143, 250}
@@ -307,7 +307,7 @@ func TestKnownCases(t *testing.T) {
 }
 
 func benchmulti(b *testing.B, k int) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	multisig := MultiSig{vks[:k], Aggregate(curve, sgs[:k]), msg}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -342,7 +342,7 @@ func BenchmarkMultiVerification2048(b *testing.B) {
 }
 
 func BenchmarkAggregateVerification(b *testing.B) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	verifkeys := make([]VerifyKey, b.N)
 	sigs := make([]Signature, b.N)
 	messages := make([][]byte, b.N)
