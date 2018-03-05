@@ -15,6 +15,8 @@ type CurveSystem interface {
 	// MakeG2Point(*big.Int, *big.Int) (Point2, bool)
 	// MakeGTPoint(*big.Int, *big.Int) (PointT, bool)
 
+	g1ToAffineCoords(Point1) (*big.Int, *big.Int)
+
 	CopyG1(Point1) Point1
 	CopyG2(Point2) Point2
 	CopyGT(PointT) PointT
@@ -54,7 +56,6 @@ type CurveSystem interface {
 
 // Point1 is a way to represent a point on G1, in the first elliptic curve.
 type Point1 interface {
-	g1ToAffineCoords() (*big.Int, *big.Int)
 }
 
 // Point2 is a way to represent a point on G2, in the first elliptic curve.

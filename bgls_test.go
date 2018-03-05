@@ -11,7 +11,7 @@ import (
 )
 
 func TestAltbnHashToCurve(t *testing.T) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	N := 10
 	msgs := make([][]byte, N)
 	for i := 0; i < N; i++ {
@@ -52,7 +52,7 @@ func testHashConsistency(hashFunc func(message []byte) (p1, p2 *big.Int), hashna
 }
 
 func TestEthereumHash(t *testing.T) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	// Tests Altbn hash to curve against known solidity test case.
 	a := []byte{116, 101, 115, 116}
 	x, y := AltbnKeccak3(a)
@@ -62,14 +62,14 @@ func TestEthereumHash(t *testing.T) {
 		t.Error("Hash does not match known Ethereum Output")
 	}
 	pt := curve.HashToG1(a)
-	x2, y2 := pt.g1ToAffineCoords()
+	x2, y2 := curve.g1ToAffineCoords(pt)
 	if x.Cmp(x2) != 0 || y.Cmp(y2) != 0 {
 		t.Error("Conversion of point to coordinates is not working")
 	}
 }
 
 func TestSingleSigner(t *testing.T) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	sk, vk, err := KeyGen(curve)
 	if err != nil {
 		t.Error("Key generation failed")
@@ -82,14 +82,14 @@ func TestSingleSigner(t *testing.T) {
 	if err != nil {
 		t.Error("test data generation failed")
 	}
-	sig := sk.Sign(curve, d)
+	sig := Sign(curve, sk, d)
 	if !Verify(curve, vk, d, sig) {
 		t.Error("Signature verification failed")
 	}
 
-	sigTmp := curve.CopyG1(sig.sig)
+	sigTmp := curve.CopyG1(sig)
 	sigTmp, _ = curve.G1Add(sigTmp, curve.GetG1())
-	sig2 := &Signature{sigTmp}
+	sig2 := sigTmp
 	if Verify(curve, vk, d, sig2) {
 		t.Error("Signature verification succeeding when it shouldn't")
 	}
@@ -98,18 +98,18 @@ func TestSingleSigner(t *testing.T) {
 }
 
 func TestAggregation(t *testing.T) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	N := 6
 	Size := 32
 	msgs := make([][]byte, N+1)
-	sigs := make([]*Signature, N+1)
-	pubkeys := make([]*VerifyKey, N+1)
+	sigs := make([]Signature, N+1)
+	pubkeys := make([]VerifyKey, N+1)
 	for i := 0; i < N; i++ {
 		msgs[i] = make([]byte, Size)
 		_, _ = rand.Read(msgs[i])
 
 		sk, vk, _ := KeyGen(curve)
-		sig := sk.Sign(curve, msgs[i])
+		sig := Sign(curve, sk, msgs[i])
 		pubkeys[i] = vk
 		sigs[i] = sig
 	}
@@ -122,7 +122,7 @@ func TestAggregation(t *testing.T) {
 	}
 	skf, vkf, _ := KeyGen(curve)
 	pubkeys[N] = vkf
-	sigs[N] = skf.Sign(curve, msgs[0])
+	sigs[N] = Sign(curve, skf, msgs[0])
 	msgs[N] = msgs[0]
 	aggSig = Aggregate(curve, sigs)
 	if VerifyAggregateSignature(curve, aggSig, pubkeys, msgs, false) {
@@ -145,18 +145,18 @@ func TestAggregation(t *testing.T) {
 }
 
 func TestMultiSig(t *testing.T) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	Tests := 5
 	Size := 32
 	Signers := 10
 	for i := 0; i < Tests; i++ {
 		msg := make([]byte, Size)
 		_, _ = rand.Read(msg)
-		signers := make([]*VerifyKey, Signers)
-		sigs := make([]*Signature, Signers)
+		signers := make([]VerifyKey, Signers)
+		sigs := make([]Signature, Signers)
 		for j := 0; j < Signers; j++ {
 			sk, vk, _ := KeyGen(curve)
-			sigs[j] = sk.Sign(curve, msg)
+			sigs[j] = Sign(curve, sk, msg)
 			signers[j] = vk
 		}
 		aggSig := Aggregate(curve, sigs)
@@ -178,7 +178,7 @@ func TestMultiSig(t *testing.T) {
 
 func BenchmarkKeygen(b *testing.B) {
 	b.ResetTimer()
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	for i := 0; i < b.N; i++ {
 		_, _, res := KeyGen(curve)
 		if res != nil {
@@ -188,7 +188,7 @@ func BenchmarkKeygen(b *testing.B) {
 }
 
 func BenchmarkAltBnHashToCurve(b *testing.B) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	ms := make([][]byte, b.N)
 	for i := 0; i < b.N; i++ {
 		ms[i] = make([]byte, 64)
@@ -201,8 +201,8 @@ func BenchmarkAltBnHashToCurve(b *testing.B) {
 }
 
 func BenchmarkSigning(b *testing.B) {
-	curve := altBn128Inst
-	sks := make([]*SigningKey, b.N)
+	curve := Altbn128Inst
+	sks := make([]SigningKey, b.N)
 	ms := make([][]byte, b.N)
 	for i := 0; i < b.N; i++ {
 		ms[i] = make([]byte, 64)
@@ -212,16 +212,16 @@ func BenchmarkSigning(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = sks[i].Sign(curve, ms[i])
+		_ = Sign(curve, sks[i], ms[i])
 	}
 }
 
 func BenchmarkVerification(b *testing.B) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	message := make([]byte, 64)
 	_, _ = rand.Read(message)
 	sk, vk, _ := KeyGen(curve)
-	sig := sk.Sign(curve, message)
+	sig := Sign(curve, sk, message)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if !Verify(curve, vk, message, sig) {
@@ -230,26 +230,26 @@ func BenchmarkVerification(b *testing.B) {
 	}
 }
 
-var vks []*VerifyKey
-var sgs []*Signature
+var vks []VerifyKey
+var sgs []Signature
 var msg []byte
 
 func TestMain(m *testing.M) {
-	curve := altBn128Inst
-	vks = make([]*VerifyKey, 2048)
-	sgs = make([]*Signature, 2048)
+	curve := Altbn128Inst
+	vks = make([]VerifyKey, 2048)
+	sgs = make([]Signature, 2048)
 	msg = make([]byte, 64)
 	_, _ = rand.Read(msg)
 	for i := 0; i < 2048; i++ {
 		sk, vk, _ := KeyGen(curve)
 		vks[i] = vk
-		sgs[i] = sk.Sign(curve, msg)
+		sgs[i] = Sign(curve, sk, msg)
 	}
 	os.Exit(m.Run())
 }
 
 func TestKnownCases(t *testing.T) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	N := 3
 	msgs := make([][]byte, N)
 	msg1 := []byte{65, 20, 86, 143, 250}
@@ -259,7 +259,7 @@ func TestKnownCases(t *testing.T) {
 	x2, _ := new(big.Int).SetString("10065703961787583059826108098259128135713944641698809475150397710106034167549", 10)
 	x3, _ := new(big.Int).SetString("17145080297596291172729378766677038070724014074212589728874454474449054012678", 10)
 
-	pubkeys := make([]*VerifyKey, N)
+	pubkeys := make([]VerifyKey, N)
 	sk1, vk1 := LoadKey(curve, x1)
 	sk2, vk2 := LoadKey(curve, x2)
 	sk3, vk3 := LoadKey(curve, x3)
@@ -271,9 +271,9 @@ func TestKnownCases(t *testing.T) {
 	pubkeys[1] = vk2
 	pubkeys[2] = vk3
 
-	sigGen1 := sk1.Sign(curve, msgs[0])
-	sigGen2 := sk2.Sign(curve, msgs[1])
-	sigGen3 := sk3.Sign(curve, msgs[2])
+	sigGen1 := Sign(curve, sk1, msgs[0])
+	sigGen2 := Sign(curve, sk2, msgs[1])
+	sigGen3 := Sign(curve, sk3, msgs[2])
 	sigVal1_1, _ := new(big.Int).SetString("21637350149051642305293442272499488026428127697128429631193536777535027009518", 10)
 	sigVal1_2, _ := new(big.Int).SetString("149479762519169687769683150632580363857094522511606512652585818657412262489", 10)
 	sigVal2_1, _ := new(big.Int).SetString("14834848655731874780751719195269704123719987185153910215596714529658047741046", 10)
@@ -284,11 +284,11 @@ func TestKnownCases(t *testing.T) {
 	sigChk2, _ := curve.MakeG1Point(sigVal2_1, sigVal2_2)
 	sigChk3, _ := curve.MakeG1Point(sigVal3_1, sigVal3_2)
 
-	if !curve.G1Equals(sigChk1, sigGen1.sig) || !curve.G1Equals(sigChk2, sigGen2.sig) || !curve.G1Equals(sigChk3, sigGen3.sig) {
+	if !curve.G1Equals(sigChk1, sigGen1) || !curve.G1Equals(sigChk2, sigGen2) || !curve.G1Equals(sigChk3, sigGen3) {
 		t.Error("Recreating message signatures from known test cases failed")
 	}
 
-	sigs := make([]*Signature, N)
+	sigs := make([]Signature, N)
 	sigs[0] = sigGen1
 	sigs[1] = sigGen2
 	sigs[2] = sigGen3
@@ -298,7 +298,7 @@ func TestKnownCases(t *testing.T) {
 	aggSigChk, _ := curve.MakeG1Point(aggSig1, aggSig2)
 
 	aggSig := Aggregate(curve, sigs)
-	if !curve.G1Equals(aggSigChk, aggSig.sig) {
+	if !curve.G1Equals(aggSigChk, aggSig) {
 		t.Error("Aggregate signature does not match the known test case.")
 	}
 	if !VerifyAggregateSignature(curve, aggSig, pubkeys, msgs, false) {
@@ -307,7 +307,7 @@ func TestKnownCases(t *testing.T) {
 }
 
 func benchmulti(b *testing.B, k int) {
-	curve := altBn128Inst
+	curve := Altbn128Inst
 	multisig := MultiSig{vks[:k], Aggregate(curve, sgs[:k]), msg}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -342,16 +342,16 @@ func BenchmarkMultiVerification2048(b *testing.B) {
 }
 
 func BenchmarkAggregateVerification(b *testing.B) {
-	curve := altBn128Inst
-	verifkeys := make([]*VerifyKey, b.N)
-	sigs := make([]*Signature, b.N)
+	curve := Altbn128Inst
+	verifkeys := make([]VerifyKey, b.N)
+	sigs := make([]Signature, b.N)
 	messages := make([][]byte, b.N)
 	for i := 0; i < b.N; i++ {
 		messages[i] = make([]byte, 64)
 		_, _ = rand.Read(messages[i])
 		sk, vk, _ := KeyGen(curve)
 		verifkeys[i] = vk
-		sigs[i] = sk.Sign(curve, messages[i])
+		sigs[i] = Sign(curve, sk, messages[i])
 	}
 	aggsig := AggSig{verifkeys, messages, Aggregate(curve, sigs)}
 	b.ResetTimer()
