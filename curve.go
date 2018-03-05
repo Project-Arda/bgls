@@ -15,7 +15,9 @@ type CurveSystem interface {
 	// MakeG2Point(*big.Int, *big.Int) (Point2, bool)
 	// MakeGTPoint(*big.Int, *big.Int) (PointT, bool)
 
-	g1ToAffineCoords(Point1) (*big.Int, *big.Int)
+	G1ToAffineCoords(Point1) (*big.Int, *big.Int)
+	// G2ToAffineCoords(Point2) (*big.Int, *big.Int)
+	// GTToAffineCoords(PointT) (*big.Int, *big.Int)
 
 	CopyG1(Point1) Point1
 	CopyG2(Point2) Point2
@@ -24,6 +26,10 @@ type CurveSystem interface {
 	MarshalG1(Point1) []byte
 	MarshalG2(Point2) []byte
 	MarshalGT(PointT) []byte
+
+	UnmarshalG1([]byte) (Point1, bool)
+	UnmarshalG2([]byte) (Point2, bool)
+	UnmarshalGT([]byte) (PointT, bool)
 
 	G1Add(Point1, Point1) (Point1, bool)
 	G1Mul(*big.Int, Point1) (Point1, bool)
@@ -49,9 +55,8 @@ type CurveSystem interface {
 	GTAdd(PointT, PointT) (PointT, bool)
 	GTMul(*big.Int, PointT) (PointT, bool)
 	GTEquals(PointT, PointT) bool
-	// getGTA() *big.Int
+	GetGT() PointT
 	// getGTQ() *big.Int
-	// getGTB() *big.Int
 }
 
 // Point1 is a way to represent a point on G1, in the first elliptic curve.
@@ -60,10 +65,8 @@ type Point1 interface {
 
 // Point2 is a way to represent a point on G2, in the first elliptic curve.
 type Point2 interface {
-	// g2ToAffineCoords() (*big.Int, *big.Int)
 }
 
 // PointT is a way to represent a point on GT, in the first elliptic curve.
 type PointT interface {
-	// gTToAffineCoords() (*big.Int, *big.Int)
 }

@@ -62,7 +62,7 @@ func TestEthereumHash(t *testing.T) {
 		t.Error("Hash does not match known Ethereum Output")
 	}
 	pt := curve.HashToG1(a)
-	x2, y2 := curve.g1ToAffineCoords(pt)
+	x2, y2 := curve.G1ToAffineCoords(pt)
 	if x.Cmp(x2) != 0 || y.Cmp(y2) != 0 {
 		t.Error("Conversion of point to coordinates is not working")
 	}
@@ -246,6 +246,48 @@ func TestMain(m *testing.M) {
 		sgs[i] = Sign(curve, sk, msg)
 	}
 	os.Exit(m.Run())
+}
+
+func TestMarshal(t *testing.T) {
+	curve := Altbn128Inst
+	marshalled := curve.MarshalG1(curve.GetG1())
+	if g1, ok := curve.UnmarshalG1(marshalled); ok {
+		if !curve.G1Equals(g1, curve.GetG1()) {
+			t.Error("Unmarshalling G1 is not consistent with Marshal G1")
+		}
+	} else {
+		t.Error("Unmarshalling G1 failed")
+	}
+	marshalled = marshalled[1:]
+	if _, ok := curve.UnmarshalG1(marshalled); ok {
+		t.Error("Unmarshalling G1 is succeeding when the byte array is of the wrong length")
+	}
+
+	marshalled = curve.MarshalG2(curve.GetG2())
+	if g2, ok := curve.UnmarshalG2(marshalled); ok {
+		if !curve.G2Equals(g2, curve.GetG2()) {
+			t.Error("Unmarshalling G2 is not consistent with Marshal G2")
+		}
+	} else {
+		t.Error("Unmarshalling G2 failed")
+	}
+	marshalled = marshalled[1:]
+	if _, ok := curve.UnmarshalG2(marshalled); ok {
+		t.Error("Unmarshalling G2 is succeeding when the byte array is of the wrong length")
+	}
+
+	marshalled = curve.MarshalGT(curve.GetGT())
+	if gT, ok := curve.UnmarshalGT(marshalled); ok {
+		if !curve.GTEquals(gT, curve.GetGT()) {
+			t.Error("Unmarshalling GT is not consistent with Marshal GT")
+		}
+	} else {
+		t.Error("Unmarshalling GT failed")
+	}
+	marshalled = marshalled[1:]
+	if _, ok := curve.UnmarshalGT(marshalled); ok {
+		t.Error("Unmarshalling GT is succeeding when the byte array is of the wrong length")
+	}
 }
 
 func TestKnownCases(t *testing.T) {
