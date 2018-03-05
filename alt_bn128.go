@@ -28,15 +28,20 @@ type altBn128PointT struct {
 	point *bn256.GT
 }
 
-func (pt *altBn128Point1) g1ToAffineCoords() (x, y *big.Int) {
-	Bytestream := pt.point.Marshal()
+func (curve altBn128) g1ToAffineCoords(pt Point1) (x, y *big.Int) {
+	p1, ok1 := (pt).(*altBn128Point1)
+	if !ok1 {
+		return nil, nil
+	}
+	Bytestream := p1.point.Marshal()
 	xBytes, yBytes := Bytestream[:32], Bytestream[32:64]
 	x = new(big.Int).SetBytes(xBytes)
 	y = new(big.Int).SetBytes(yBytes)
 	return
 }
 
-var altBn128Inst = &altBn128{}
+// Altbn128Inst is the instance for the altbn128 curve, with all of its functions.
+var Altbn128Inst = &altBn128{}
 
 func (curve *altBn128) Pair(pt1 Point1, pt2 Point2) (PointT, bool) {
 	p1, ok1 := (pt1).(*altBn128Point1)
@@ -271,7 +276,7 @@ var altbnG1Order, _ = new(big.Int).SetString("2188824287183927522224640574525727
 // AltbnSha3 Hashes a message to a point on Altbn128 using SHA3 and try and increment
 // The return value is the x,y affine coordinate pair.
 func AltbnSha3(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash64(message, sha3.Sum512, altBn128Inst)
+	p1, p2 = hash64(message, sha3.Sum512, Altbn128Inst)
 	return
 }
 
@@ -279,21 +284,21 @@ func AltbnSha3(message []byte) (p1, p2 *big.Int) {
 // Keccak3 is only for compatability with Ethereum hashing.
 // The return value is the x,y affine coordinate pair.
 func AltbnKeccak3(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash32(message, EthereumSum256, altBn128Inst)
+	p1, p2 = hash32(message, EthereumSum256, Altbn128Inst)
 	return
 }
 
 // AltbnBlake2b Hashes a message to a point on Altbn128 using Blake2b and try and increment
 // The return value is the x,y affine coordinate pair.
 func AltbnBlake2b(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash64(message, blake2b.Sum512, altBn128Inst)
+	p1, p2 = hash64(message, blake2b.Sum512, Altbn128Inst)
 	return
 }
 
 // AltbnKang12 Hashes a message to a point on Altbn128 using Blake2b and try and increment
 // The return value is the x,y affine coordinate pair.
 func AltbnKang12(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash64(message, kang12_64, altBn128Inst)
+	p1, p2 = hash64(message, kang12_64, Altbn128Inst)
 	return
 }
 
