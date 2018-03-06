@@ -9,105 +9,102 @@ import (
 	"math/big"
 )
 
-//SigningKey wraps secret exponent
-type SigningKey *big.Int
-
-//VerifyKey wraps public G2 curve point
-type VerifyKey Point2
-
-//Signature Wraps G1 curve point as signature
-type Signature Point1
-
-//Authentication is a proof of a valid VerifyKey
-type Authentication Signature
-
 //MultiSig holds set of keys and one message plus signature
 type MultiSig struct {
-	keys []VerifyKey
-	sig  Signature
+	keys []Point2
+	sig  Point1
 	msg  []byte
 }
 
 //AggSig holds paired sequences of keys and messages, and one signature
 type AggSig struct {
-	keys []VerifyKey
+	keys []Point2
 	msgs [][]byte
-	sig  Signature
+	sig  Point1
 }
 
-//KeyGen generates a SigningKey and VerifyKey
-func KeyGen(curve CurveSystem) (SigningKey, VerifyKey, error) {
+//KeyGen generates a *big.Int and Point2
+func KeyGen(curve CurveSystem) (*big.Int, Point2, error) {
 	x, err := rand.Int(rand.Reader, curve.getG1Order())
 	if err != nil {
 		return nil, nil, err
 	}
-	sk, vk := LoadKey(curve, x)
-	return sk, vk, nil
+	sk, pubKey := LoadKey(curve, x)
+	return sk, pubKey, nil
 }
 
-//LoadKey turns secret key into SigninKey and VerifyKey
-func LoadKey(curve CurveSystem, sk *big.Int) (SigningKey, VerifyKey) {
-	vk, _ := curve.G2Mul(sk, curve.GetG2())
-	return sk, vk
+//LoadKey turns secret key into SigninKey and Point2
+func LoadKey(curve CurveSystem, sk *big.Int) (*big.Int, Point2) {
+	pubKey := curve.GetG2().Mul(sk)
+	return sk, pubKey
 }
 
-// Authenticate generates an Authentication for a valid SigningKey/VerifyKey combo
+// Authenticate generates an Authentication for a valid *big.Int/Point2 combo
 // It signs a verification key with x.
-func Authenticate(curve CurveSystem, sk SigningKey, v VerifyKey) Signature {
+func Authenticate(curve CurveSystem, sk *big.Int, v Point2) Point1 {
 	return AuthenticateCustHash(curve, sk, v, curve.HashToG1)
 }
 
-// AuthenticateCustHash generates an Authentication for a valid SigningKey/VerifyKey combo
+// AuthenticateCustHash generates an Authentication for a valid *big.Int/Point2 combo
 // It signs a verification key with x. This runs with the specified hash function.
-func AuthenticateCustHash(curve CurveSystem, sk SigningKey, v VerifyKey, hash func([]byte) Point1) Signature {
-	m := curve.MarshalG2(v)
+func AuthenticateCustHash(curve CurveSystem, sk *big.Int, v Point2, hash func([]byte) Point1) Point1 {
+	m := v.Marshal()
 	return SignCustHash(curve, sk, m, hash)
 }
 
-//CheckAuthentication verifies that this VerifyKey is valid
-func CheckAuthentication(curve CurveSystem, v VerifyKey, authentication Signature) bool {
+//CheckAuthentication verifies that this Point2 is valid
+func CheckAuthentication(curve CurveSystem, v Point2, authentication Point1) bool {
 	return CheckAuthenticationCustHash(curve, v, authentication, curve.HashToG1)
 }
 
-//CheckAuthenticationCustHash verifies that this VerifyKey is valid, with the specified hash function
-func CheckAuthenticationCustHash(curve CurveSystem, v VerifyKey, authentication Signature, hash func([]byte) Point1) bool {
-	m := curve.MarshalG2(v)
+//CheckAuthenticationCustHash verifies that this Point2 is valid, with the specified hash function
+func CheckAuthenticationCustHash(curve CurveSystem, v Point2, authentication Point1, hash func([]byte) Point1) bool {
+	m := v.Marshal()
 	return VerifyCustHash(curve, v, m, authentication, hash)
 }
 
 //Sign creates a signature on a message with a private key
-func Sign(curve CurveSystem, sk SigningKey, m []byte) Signature {
+func Sign(curve CurveSystem, sk *big.Int, m []byte) Point1 {
 	return SignCustHash(curve, sk, m, curve.HashToG1)
 }
 
 // SignCustHash creates a signature on a message with a private key, using
 // a supplied function to hash to g1.
-func SignCustHash(curve CurveSystem, sk SigningKey, m []byte, hash func([]byte) Point1) Signature {
+func SignCustHash(curve CurveSystem, sk *big.Int, m []byte, hash func([]byte) Point1) Point1 {
 	h := hash(m)
-	i, _ := curve.G1Mul(sk, h)
+	i := h.Mul(sk)
 	return i
 }
 
 // Verify checks that a signature is valid
-func Verify(curve CurveSystem, vk VerifyKey, m []byte, sig Signature) bool {
-	return VerifyCustHash(curve, vk, m, sig, curve.HashToG1)
+func Verify(curve CurveSystem, pubKey Point2, m []byte, sig Point1) bool {
+	return VerifyCustHash(curve, pubKey, m, sig, curve.HashToG1)
 }
 
 // VerifyCustHash checks that a signature is valid with the supplied hash function
-func VerifyCustHash(curve CurveSystem, vk VerifyKey, m []byte, sig Signature, hash func([]byte) Point1) bool {
+func VerifyCustHash(curve CurveSystem, pubKey Point2, m []byte, sig Point1, hash func([]byte) Point1) bool {
 	h := hash(m)
-	p1, _ := curve.Pair(h, vk)
+	p1, _ := curve.Pair(h, pubKey)
 	p2, _ := curve.Pair(sig, curve.GetG2())
-	return curve.GTEquals(p1, p2)
+	return p1.Equals(p2)
 }
 
-// Aggregate turns a set of signatures into a single signature
-func Aggregate(curve CurveSystem, sigs []Signature) Signature {
-	a := curve.CopyG1(sigs[0])
+// AggregateG1 takes the sum of points on G1. This is used to convert a set of signatures into a single signature
+func AggregateG1(curve CurveSystem, sigs []Point1) Point1 {
+	aggG1 := sigs[0].Copy()
 	for _, s := range sigs[1:] {
-		a, _ = curve.G1Add(a, s)
+		aggG1, _ = aggG1.Add(s)
 	}
-	return a
+	return aggG1
+}
+
+// AggregateG2 takes the sum of points on G1. This is used to sum a set of public keys for the multisignature
+func AggregateG2(curve CurveSystem, keys []Point2) Point2 {
+	aggG2 := keys[0].Copy()
+	for _, s := range keys[1:] {
+		aggG2, _ = aggG2.Add(s)
+	}
+	return aggG2
 }
 
 // Verify checks that all messages were signed by associated keys
@@ -118,7 +115,7 @@ func (a AggSig) Verify(curve CurveSystem) bool {
 
 // VerifyAggregateSignature verifies that the aggregated signature proves that all messages were signed by associated keys
 // Will fail under duplicate messages, unless allow duplicates is True.
-func VerifyAggregateSignature(curve CurveSystem, aggsig Signature, keys []VerifyKey, msgs [][]byte, allowDuplicates bool) bool {
+func VerifyAggregateSignature(curve CurveSystem, aggsig Point1, keys []Point2, msgs [][]byte, allowDuplicates bool) bool {
 	if len(keys) != len(msgs) {
 		return false
 	}
@@ -133,9 +130,9 @@ func VerifyAggregateSignature(curve CurveSystem, aggsig Signature, keys []Verify
 	for i := 1; i < len(msgs); i++ {
 		h = curve.HashToG1(msgs[i])
 		e3, _ := curve.Pair(h, keys[i]) // Temporary variable to store result of pairing
-		e2, _ = curve.GTAdd(e3, e2)
+		e2, _ = e3.Add(e2)
 	}
-	return curve.GTEquals(e1, e2)
+	return e1.Equals(e2)
 }
 
 //Verify checks that a single message has been signed by a set of keys
@@ -146,15 +143,12 @@ func (m MultiSig) Verify(curve CurveSystem) bool {
 
 // VerifyMultiSignature checks that the aggregate signature correctly proves that a single message has been signed by a set of keys,
 // vulnerable against chosen key attack, if keys have not been authenticated
-func VerifyMultiSignature(curve CurveSystem, aggsig Signature, keys []VerifyKey, msg []byte) bool {
+func VerifyMultiSignature(curve CurveSystem, aggsig Point1, keys []Point2, msg []byte) bool {
 	e1, _ := curve.Pair(aggsig, curve.GetG2())
-	vs := curve.CopyG2(keys[0])
-	for i := 1; i < len(keys); i++ {
-		vs, _ = curve.G2Add(vs, keys[i])
-	}
+	vs := AggregateG2(curve, keys)
 	h := curve.HashToG1(msg)
 	e2, _ := curve.Pair(h, vs)
-	return curve.GTEquals(e1, e2)
+	return e1.Equals(e2)
 }
 
 func containsDuplicateMessage(msgs [][]byte) bool {

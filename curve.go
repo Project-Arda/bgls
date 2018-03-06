@@ -15,58 +15,55 @@ type CurveSystem interface {
 	// MakeG2Point(*big.Int, *big.Int) (Point2, bool)
 	// MakeGTPoint(*big.Int, *big.Int) (PointT, bool)
 
-	G1ToAffineCoords(Point1) (*big.Int, *big.Int)
 	// G2ToAffineCoords(Point2) (*big.Int, *big.Int)
 	// GTToAffineCoords(PointT) (*big.Int, *big.Int)
-
-	CopyG1(Point1) Point1
-	CopyG2(Point2) Point2
-	CopyGT(PointT) PointT
-
-	MarshalG1(Point1) []byte
-	MarshalG2(Point2) []byte
-	MarshalGT(PointT) []byte
 
 	UnmarshalG1([]byte) (Point1, bool)
 	UnmarshalG2([]byte) (Point2, bool)
 	UnmarshalGT([]byte) (PointT, bool)
 
-	G1Add(Point1, Point1) (Point1, bool)
-	G1Mul(*big.Int, Point1) (Point1, bool)
-	G1Equals(Point1, Point1) bool
 	GetG1() Point1
+	GetG2() Point2
+	GetGT() PointT
+
 	HashToG1(message []byte) Point1
 
 	getG1Q() *big.Int
+	getG2Q() *big.Int
+	// getGTQ() *big.Int
+
 	getG1A() *big.Int
 	getG1B() *big.Int
 	getG1Order() *big.Int
 	g1XToYSquared(*big.Int) *big.Int
-
-	G2Add(Point2, Point2) (Point2, bool)
-	G2Mul(*big.Int, Point2) (Point2, bool)
-	G2Equals(Point2, Point2) bool
-	GetG2() Point2
-
-	getG2Q() *big.Int
-	// getG2A() *big.Int
-	// getG2B() *big.Int
-
-	GTAdd(PointT, PointT) (PointT, bool)
-	GTMul(*big.Int, PointT) (PointT, bool)
-	GTEquals(PointT, PointT) bool
-	GetGT() PointT
-	// getGTQ() *big.Int
 }
 
 // Point1 is a way to represent a point on G1, in the first elliptic curve.
 type Point1 interface {
+	Add(Point1) (Point1, bool)
+	Copy() Point1
+	Equals(Point1) bool
+	Marshal() []byte
+	Mul(*big.Int) Point1
+	ToAffineCoords() (*big.Int, *big.Int)
 }
 
 // Point2 is a way to represent a point on G2, in the first elliptic curve.
 type Point2 interface {
+	Add(Point2) (Point2, bool)
+	Copy() Point2
+	Equals(Point2) bool
+	Marshal() []byte
+	Mul(*big.Int) Point2
+	// ToAffineCoords() (*big.Int, *big.Int)
 }
 
 // PointT is a way to represent a point on GT, in the first elliptic curve.
 type PointT interface {
+	Add(PointT) (PointT, bool)
+	Copy() PointT
+	Equals(PointT) bool
+	Marshal() []byte
+	Mul(*big.Int) PointT
+	// ToAffineCoords() (*big.Int, *big.Int)
 }

@@ -45,9 +45,9 @@ func makeBls12Cofactor(x *big.Int) *big.Int {
 // 	return
 // }
 
-func bls12XToYSquared(x *big.Int) *big.Int {
-	result := new(big.Int)
-	result.Exp(x, three, bls12Q)
-	result.Add(result, bls12B)
-	return result
-}
+// func bls12XToYSquared(x *big.Int) *big.Int {
+// 	result := new(big.Int)
+// 	result.Exp(x, three, bls12Q)
+// 	result.Add(result, bls12B)
+// 	return result
+// }

@@ -28,20 +28,8 @@ type altbn128PointT struct {
 	point *bn256.GT
 }
 
-func (curve altbn128) G1ToAffineCoords(pt Point1) (x, y *big.Int) {
-	p1, ok1 := (pt).(*altbn128Point1)
-	if !ok1 {
-		return nil, nil
-	}
-	Bytestream := p1.point.Marshal()
-	xBytes, yBytes := Bytestream[:32], Bytestream[32:64]
-	x = new(big.Int).SetBytes(xBytes)
-	y = new(big.Int).SetBytes(yBytes)
-	return
-}
-
 // Altbn128Inst is the instance for the altbn128 curve, with all of its functions.
-var Altbn128Inst = &altbn128{}
+var Altbn128 = &altbn128{}
 
 func (curve *altbn128) Pair(pt1 Point1, pt2 Point2) (PointT, bool) {
 	p1, ok1 := (pt1).(*altbn128Point1)
@@ -68,6 +56,45 @@ func (curve *altbn128) MakeG1Point(x, y *big.Int) (Point1, bool) {
 	return &altbn128Point1{result}, true
 }
 
+func (g1Point *altbn128Point1) Add(otherPoint1 Point1) (Point1, bool) {
+	if other, ok := (otherPoint1).(*altbn128Point1); ok {
+		sum := new(bn256.G1).Add(g1Point.point, other.point)
+		ret := &altbn128Point1{sum}
+		return ret, true
+	}
+	return nil, false
+}
+
+func (g1Point *altbn128Point1) Copy() Point1 {
+	p, _ := new(bn256.G1).Unmarshal(g1Point.point.Marshal())
+	return &altbn128Point1{p}
+}
+
+func (g1Point *altbn128Point1) Equals(otherPoint1 Point1) bool {
+	if other, ok := (otherPoint1).(*altbn128Point1); ok {
+		return bytes.Equal(g1Point.Marshal(), other.Marshal())
+	}
+	return false
+}
+
+func (g1Point *altbn128Point1) Marshal() []byte {
+	return g1Point.point.Marshal()
+}
+
+func (g1Point *altbn128Point1) Mul(scalar *big.Int) Point1 {
+	prod := new(bn256.G1).ScalarMult(g1Point.point, scalar)
+	ret := &altbn128Point1{prod}
+	return ret
+}
+
+func (g1Point *altbn128Point1) ToAffineCoords() (x, y *big.Int) {
+	Bytestream := g1Point.Marshal()
+	xBytes, yBytes := Bytestream[:32], Bytestream[32:64]
+	x = new(big.Int).SetBytes(xBytes)
+	y = new(big.Int).SetBytes(yBytes)
+	return
+}
+
 // AltbnG2ToCoord takes a point in G2 of Altbn_128, and returns its affine coordinates
 func (curve *altbn128) MakeG2Point(pt *bn256.G2) (xx, xy, yx, yy *big.Int) {
 	Bytestream := pt.Marshal()
@@ -79,49 +106,66 @@ func (curve *altbn128) MakeG2Point(pt *bn256.G2) (xx, xy, yx, yy *big.Int) {
 	return
 }
 
-func (curve *altbn128) CopyG1(pt Point1) Point1 {
-	if g1Point, ok := pt.(*altbn128Point1); ok {
-		p, _ := new(bn256.G1).Unmarshal(g1Point.point.Marshal())
-		return &altbn128Point1{p}
+func (g2Point *altbn128Point2) Add(otherPoint2 Point2) (Point2, bool) {
+	if other, ok := (otherPoint2).(*altbn128Point2); ok {
+		sum := new(bn256.G2).Add(g2Point.point, other.point)
+		ret := &altbn128Point2{sum}
+		return ret, true
 	}
-	return nil
+	return nil, false
 }
 
-func (curve *altbn128) CopyG2(pt Point2) Point2 {
-	if g2Point, ok := pt.(*altbn128Point2); ok {
-		p, _ := new(bn256.G2).Unmarshal(g2Point.point.Marshal())
-		return &altbn128Point2{p}
-	}
-	return nil
+func (g2Point *altbn128Point2) Copy() Point2 {
+	p, _ := new(bn256.G2).Unmarshal(g2Point.point.Marshal())
+	return &altbn128Point2{p}
 }
 
-func (curve *altbn128) CopyGT(pt PointT) PointT {
-	if gTPoint, ok := pt.(altbn128PointT); ok {
-		p, _ := new(bn256.GT).Unmarshal(gTPoint.point.Marshal())
-		return &altbn128PointT{p}
+func (g2Point *altbn128Point2) Equals(otherPoint2 Point2) bool {
+	if other, ok := (otherPoint2).(*altbn128Point2); ok {
+		return bytes.Equal(g2Point.Marshal(), other.Marshal())
 	}
-	return nil
+	return false
 }
 
-func (curve *altbn128) MarshalG1(pt Point1) []byte {
-	if g1Point, ok := pt.(*altbn128Point1); ok {
-		return g1Point.point.Marshal()
-	}
-	return nil
+func (g2Point *altbn128Point2) Marshal() []byte {
+	return g2Point.point.Marshal()
 }
 
-func (curve *altbn128) MarshalG2(pt Point2) []byte {
-	if g2Point, ok := pt.(*altbn128Point2); ok {
-		return g2Point.point.Marshal()
-	}
-	return nil
+func (g2Point *altbn128Point2) Mul(scalar *big.Int) Point2 {
+	prod := new(bn256.G2).ScalarMult(g2Point.point, scalar)
+	ret := &altbn128Point2{prod}
+	return ret
 }
 
-func (curve *altbn128) MarshalGT(pt PointT) []byte {
-	if gTPoint, ok := pt.(altbn128PointT); ok {
-		return gTPoint.point.Marshal()
+func (gTPoint altbn128PointT) Add(otherPointT PointT) (PointT, bool) {
+	if other, ok := (otherPointT).(altbn128PointT); ok {
+		sum := new(bn256.GT).Add(gTPoint.point, other.point)
+		ret := altbn128PointT{sum}
+		return ret, true
 	}
-	return nil
+	return nil, false
+}
+
+func (gTPoint altbn128PointT) Copy() PointT {
+	p, _ := new(bn256.GT).Unmarshal(gTPoint.point.Marshal())
+	return altbn128PointT{p}
+}
+
+func (gTPoint altbn128PointT) Marshal() []byte {
+	return gTPoint.point.Marshal()
+}
+
+func (gTPoint altbn128PointT) Equals(otherPointT PointT) bool {
+	if other, ok := (otherPointT).(altbn128PointT); ok {
+		return bytes.Equal(gTPoint.Marshal(), other.Marshal())
+	}
+	return false
+}
+
+func (gTPoint altbn128PointT) Mul(scalar *big.Int) PointT {
+	prod := new(bn256.GT).ScalarMult(gTPoint.point, scalar)
+	ret := altbn128PointT{prod}
+	return ret
 }
 
 func (curve *altbn128) UnmarshalG1(data []byte) (Point1, bool) {
@@ -154,35 +198,6 @@ func (curve *altbn128) UnmarshalGT(data []byte) (PointT, bool) {
 	return nil, false
 }
 
-func (curve *altbn128) G1Add(pt1 Point1, pt2 Point1) (Point1, bool) {
-	p1, ok1 := (pt1).(*altbn128Point1)
-	p2, ok2 := (pt2).(*altbn128Point1)
-	if !ok1 || !ok2 {
-		return nil, false
-	}
-	p3 := new(bn256.G1).Add(p1.point, p2.point)
-	ret := &altbn128Point1{p3}
-	return ret, true
-}
-
-func (curve *altbn128) G1Mul(scalar *big.Int, pt Point1) (Point1, bool) {
-	if g1Point, ok := pt.(*altbn128Point1); ok {
-		prod := new(bn256.G1).ScalarMult(g1Point.point, scalar)
-		ret := &altbn128Point1{prod}
-		return ret, true
-	}
-	return nil, false
-}
-
-func (curve *altbn128) G1Equals(a, b Point1) bool {
-	a1, ok1 := (a).(*altbn128Point1)
-	b1, ok2 := (b).(*altbn128Point1)
-	if !ok1 || !ok2 {
-		return false
-	}
-	return bytes.Equal(a1.point.Marshal(), b1.point.Marshal())
-}
-
 func (curve *altbn128) getG1A() *big.Int {
 	return zero
 }
@@ -193,10 +208,6 @@ func (curve *altbn128) getG1B() *big.Int {
 
 func (curve *altbn128) getG1Q() *big.Int {
 	return altbnG1Q
-}
-
-func (curve *altbn128) GetG1() Point1 {
-	return altbnG1
 }
 
 func (curve *altbn128) getG1Order() *big.Int {
@@ -210,66 +221,12 @@ func (curve *altbn128) g1XToYSquared(x *big.Int) *big.Int {
 	return result
 }
 
-func (curve *altbn128) G2Add(pt1 Point2, pt2 Point2) (Point2, bool) {
-	p1, ok1 := (pt1).(*altbn128Point2)
-	p2, ok2 := (pt2).(*altbn128Point2)
-	if !ok1 || !ok2 {
-		return nil, false
-	}
-	p3 := new(bn256.G2).Add(p1.point, p2.point)
-	ret := &altbn128Point2{p3}
-	return ret, true
-}
-
-func (curve *altbn128) G2Mul(scalar *big.Int, pt Point2) (Point2, bool) {
-	if g2Point, ok := pt.(*altbn128Point2); ok {
-		prod := new(bn256.G2).ScalarMult(g2Point.point, scalar)
-		ret := &altbn128Point2{prod}
-		return ret, true
-	}
-	return nil, false
-}
-
-func (curve *altbn128) G2Equals(a, b Point2) bool {
-	a1, ok1 := (a).(*altbn128Point2)
-	b1, ok2 := (b).(*altbn128Point2)
-	if !ok1 || !ok2 {
-		return false
-	}
-	return bytes.Equal(a1.point.Marshal(), b1.point.Marshal())
-}
-
 func (curve *altbn128) getG2Q() *big.Int {
 	return altbnG2Q
 }
 
-func (curve *altbn128) GTAdd(pt1 PointT, pt2 PointT) (PointT, bool) {
-	p1, ok1 := (pt1).(altbn128PointT)
-	p2, ok2 := (pt2).(altbn128PointT)
-	if !ok1 || !ok2 {
-		return nil, false
-	}
-	p3 := new(bn256.GT).Add(p1.point, p2.point)
-	ret := altbn128PointT{p3}
-	return ret, true
-}
-
-func (curve *altbn128) GTEquals(a, b PointT) bool {
-	a1, ok1 := a.(altbn128PointT)
-	b1, ok2 := b.(altbn128PointT)
-	if !ok1 || !ok2 {
-		return false
-	}
-	return bytes.Equal(a1.point.Marshal(), b1.point.Marshal())
-}
-
-func (curve *altbn128) GTMul(scalar *big.Int, pt PointT) (PointT, bool) {
-	if gTPoint, ok := pt.(altbn128PointT); ok {
-		prod := new(bn256.GT).ScalarMult(gTPoint.point, scalar)
-		ret := &altbn128PointT{prod}
-		return ret, true
-	}
-	return nil, false
+func (curve *altbn128) GetG1() Point1 {
+	return altbnG1
 }
 
 func (curve *altbn128) GetG2() Point2 {
@@ -293,7 +250,7 @@ var altbnSqrtn3, _ = new(big.Int).SetString("44079209702962438428372074856515240
 
 var altbnG1 = &altbn128Point1{new(bn256.G1).ScalarBaseMult(one)}
 var altbnG2 = &altbn128Point2{new(bn256.G2).ScalarBaseMult(one)}
-var altbnGT, _ = Altbn128Inst.Pair(altbnG1, altbnG2)
+var altbnGT, _ = Altbn128.Pair(altbnG1, altbnG2)
 
 var altbnG1Order, _ = new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
 
@@ -302,7 +259,7 @@ var altbnG1Order, _ = new(big.Int).SetString("2188824287183927522224640574525727
 // AltbnSha3 Hashes a message to a point on Altbn128 using SHA3 and try and increment
 // The return value is the x,y affine coordinate pair.
 func AltbnSha3(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash64(message, sha3.Sum512, Altbn128Inst)
+	p1, p2 = hash64(message, sha3.Sum512, Altbn128)
 	return
 }
 
@@ -310,21 +267,21 @@ func AltbnSha3(message []byte) (p1, p2 *big.Int) {
 // Keccak3 is only for compatability with Ethereum hashing.
 // The return value is the x,y affine coordinate pair.
 func AltbnKeccak3(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash32(message, EthereumSum256, Altbn128Inst)
+	p1, p2 = hash32(message, EthereumSum256, Altbn128)
 	return
 }
 
 // AltbnBlake2b Hashes a message to a point on Altbn128 using Blake2b and try and increment
 // The return value is the x,y affine coordinate pair.
 func AltbnBlake2b(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash64(message, blake2b.Sum512, Altbn128Inst)
+	p1, p2 = hash64(message, blake2b.Sum512, Altbn128)
 	return
 }
 
 // AltbnKang12 Hashes a message to a point on Altbn128 using Blake2b and try and increment
 // The return value is the x,y affine coordinate pair.
 func AltbnKang12(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash64(message, kang12_64, Altbn128Inst)
+	p1, p2 = hash64(message, kang12_64, Altbn128)
 	return
 }
 
