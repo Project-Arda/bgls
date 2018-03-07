@@ -10,7 +10,6 @@ import (
 // CurveSystem is a set of parameters and functions for a pairing based cryptosystem
 // It has everything necessary to support all bgls functionality which we use.
 type CurveSystem interface {
-	Pair(Point1, Point2) (PointT, bool)
 	MakeG1Point(*big.Int, *big.Int) (Point1, bool)
 	// MakeG2Point(*big.Int, *big.Int) (Point2, bool)
 	// MakeGTPoint(*big.Int, *big.Int) (PointT, bool)
@@ -45,6 +44,7 @@ type Point1 interface {
 	Equals(Point1) bool
 	Marshal() []byte
 	Mul(*big.Int) Point1
+	Pair(Point2) (PointT, bool)
 	ToAffineCoords() (*big.Int, *big.Int)
 }
 

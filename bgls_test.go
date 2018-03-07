@@ -74,7 +74,7 @@ func TestSingleSigner(t *testing.T) {
 	if err != nil {
 		t.Error("Key generation failed")
 	}
-	if !CheckAuthentication(curve, vk, Authenticate(curve, sk, vk)) {
+	if !CheckAuthentication(curve, vk, Authenticate(curve, sk)) {
 		t.Error("Key Authentication failed")
 	}
 	d := make([]byte, 64)
@@ -113,7 +113,7 @@ func TestAggregation(t *testing.T) {
 		pubkeys[i] = vk
 		sigs[i] = sig
 	}
-	aggSig := AggregateG1(curve, sigs[:N])
+	aggSig := AggregateG1(sigs[:N])
 	if !VerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N], false) {
 		t.Error("Aggregate Point1 verification failed")
 	}
@@ -124,7 +124,7 @@ func TestAggregation(t *testing.T) {
 	pubkeys[N] = vkf
 	sigs[N] = Sign(curve, skf, msgs[0])
 	msgs[N] = msgs[0]
-	aggSig = AggregateG1(curve, sigs)
+	aggSig = AggregateG1(sigs)
 	if VerifyAggregateSignature(curve, aggSig, pubkeys, msgs, false) {
 		t.Error("Aggregate Point1 succeeding with duplicate messages with allow duplicates being false")
 	}
@@ -136,7 +136,7 @@ func TestAggregation(t *testing.T) {
 	}
 	msgs[0] = msgs[1]
 	msgs[1] = msgs[N]
-	aggSig = AggregateG1(curve, sigs[:N])
+	aggSig = AggregateG1(sigs[:N])
 	if VerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N], false) {
 		t.Error("Aggregate Point1 succeeded with messages 0 and 1 switched")
 	}
@@ -159,7 +159,7 @@ func TestMultiSig(t *testing.T) {
 			sigs[j] = Sign(curve, sk, msg)
 			signers[j] = vk
 		}
-		aggSig := AggregateG1(curve, sigs)
+		aggSig := AggregateG1(sigs)
 		if !VerifyMultiSignature(curve, aggSig, signers, msg) {
 			t.Error("Aggregate MultiSig verification failed")
 		}
@@ -297,14 +297,14 @@ func TestKnownCases(t *testing.T) {
 	msg1 := []byte{65, 20, 86, 143, 250}
 	msg2 := []byte{157, 76, 30, 64, 128}
 	msg3 := []byte{202, 255, 227, 59, 238}
-	x1, _ := new(big.Int).SetString("7830752896741750908830464020410322281763657818307273013205711220156049734883", 10)
-	x2, _ := new(big.Int).SetString("10065703961787583059826108098259128135713944641698809475150397710106034167549", 10)
-	x3, _ := new(big.Int).SetString("17145080297596291172729378766677038070724014074212589728874454474449054012678", 10)
+	sk1, _ := new(big.Int).SetString("7830752896741750908830464020410322281763657818307273013205711220156049734883", 10)
+	sk2, _ := new(big.Int).SetString("10065703961787583059826108098259128135713944641698809475150397710106034167549", 10)
+	sk3, _ := new(big.Int).SetString("17145080297596291172729378766677038070724014074212589728874454474449054012678", 10)
 
 	pubkeys := make([]Point2, N)
-	sk1, vk1 := LoadKey(curve, x1)
-	sk2, vk2 := LoadKey(curve, x2)
-	sk3, vk3 := LoadKey(curve, x3)
+	vk1 := LoadPublicKey(curve, sk1)
+	vk2 := LoadPublicKey(curve, sk2)
+	vk3 := LoadPublicKey(curve, sk3)
 	msgs[0] = msg1
 	msgs[1] = msg2
 	msgs[2] = msg3
@@ -339,7 +339,7 @@ func TestKnownCases(t *testing.T) {
 	aggSig2, _ := new(big.Int).SetString("5755139208159515629159661524903000057840676877654799839167369795924360592246", 10)
 	aggSigChk, _ := curve.MakeG1Point(aggSig1, aggSig2)
 
-	aggSig := AggregateG1(curve, sigs)
+	aggSig := AggregateG1(sigs)
 	if !aggSigChk.Equals(aggSig) {
 		t.Error("Aggregate Point1 does not match the known test case.")
 	}
@@ -350,7 +350,7 @@ func TestKnownCases(t *testing.T) {
 
 func benchmulti(b *testing.B, k int) {
 	curve := Altbn128
-	multisig := MultiSig{vks[:k], AggregateG1(curve, sgs[:k]), msg}
+	multisig := MultiSig{vks[:k], AggregateG1(sgs[:k]), msg}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if !multisig.Verify(curve) {
@@ -395,7 +395,7 @@ func BenchmarkAggregateVerification(b *testing.B) {
 		verifkeys[i] = vk
 		sigs[i] = Sign(curve, sk, messages[i])
 	}
-	aggsig := AggSig{verifkeys, messages, AggregateG1(curve, sigs)}
+	aggsig := AggSig{verifkeys, messages, AggregateG1(sigs)}
 	b.ResetTimer()
 	if !aggsig.Verify(curve) {
 		b.Error("Aggregate verificaton failed")

@@ -31,17 +31,6 @@ type altbn128PointT struct {
 // Altbn128Inst is the instance for the altbn128 curve, with all of its functions.
 var Altbn128 = &altbn128{}
 
-func (curve *altbn128) Pair(pt1 Point1, pt2 Point2) (PointT, bool) {
-	p1, ok1 := (pt1).(*altbn128Point1)
-	p2, ok2 := (pt2).(*altbn128Point2)
-	if !ok1 || !ok2 {
-		return nil, false
-	}
-	p3 := bn256.Pair(p1.point, p2.point)
-	ret := altbn128PointT{p3}
-	return ret, true
-}
-
 // AltbnMkG1Point copies points into []byte and unmarshals to get around curvePoint not being exported
 // This is copied from bn256.G1.Marshal (modified)
 func (curve *altbn128) MakeG1Point(x, y *big.Int) (Point1, bool) {
@@ -85,6 +74,15 @@ func (g1Point *altbn128Point1) Mul(scalar *big.Int) Point1 {
 	prod := new(bn256.G1).ScalarMult(g1Point.point, scalar)
 	ret := &altbn128Point1{prod}
 	return ret
+}
+
+func (g1Point *altbn128Point1) Pair(g2Point Point2) (PointT, bool) {
+	if other, ok := (g2Point).(*altbn128Point2); ok {
+		p3 := bn256.Pair(g1Point.point, other.point)
+		ret := altbn128PointT{p3}
+		return ret, true
+	}
+	return nil, false
 }
 
 func (g1Point *altbn128Point1) ToAffineCoords() (x, y *big.Int) {
@@ -250,7 +248,7 @@ var altbnSqrtn3, _ = new(big.Int).SetString("44079209702962438428372074856515240
 
 var altbnG1 = &altbn128Point1{new(bn256.G1).ScalarBaseMult(one)}
 var altbnG2 = &altbn128Point2{new(bn256.G2).ScalarBaseMult(one)}
-var altbnGT, _ = Altbn128.Pair(altbnG1, altbnG2)
+var altbnGT, _ = altbnG1.Pair(altbnG2)
 
 var altbnG1Order, _ = new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
 
