@@ -11,7 +11,7 @@ import (
 )
 
 func TestAltbnHashToCurve(t *testing.T) {
-	curve := Altbn128Inst
+	curve := Altbn128
 	N := 10
 	msgs := make([][]byte, N)
 	for i := 0; i < N; i++ {
@@ -24,7 +24,7 @@ func TestAltbnHashToCurve(t *testing.T) {
 
 		p1 := curve.HashToG1(msgs[i])
 		p2 := curve.HashToG1(msgs[i])
-		if !curve.G1Equals(p1, p2) {
+		if !p1.Equals(p2) {
 			t.Error("inconsistent results in Altbn HashToCurve")
 		}
 	}
@@ -52,7 +52,7 @@ func testHashConsistency(hashFunc func(message []byte) (p1, p2 *big.Int), hashna
 }
 
 func TestEthereumHash(t *testing.T) {
-	curve := Altbn128Inst
+	curve := Altbn128
 	// Tests Altbn hash to curve against known solidity test case.
 	a := []byte{116, 101, 115, 116}
 	x, y := AltbnKeccak3(a)
@@ -62,19 +62,19 @@ func TestEthereumHash(t *testing.T) {
 		t.Error("Hash does not match known Ethereum Output")
 	}
 	pt := curve.HashToG1(a)
-	x2, y2 := curve.g1ToAffineCoords(pt)
+	x2, y2 := pt.ToAffineCoords()
 	if x.Cmp(x2) != 0 || y.Cmp(y2) != 0 {
 		t.Error("Conversion of point to coordinates is not working")
 	}
 }
 
 func TestSingleSigner(t *testing.T) {
-	curve := Altbn128Inst
+	curve := Altbn128
 	sk, vk, err := KeyGen(curve)
 	if err != nil {
 		t.Error("Key generation failed")
 	}
-	if !CheckAuthentication(curve, vk, Authenticate(curve, sk, vk)) {
+	if !CheckAuthentication(curve, vk, Authenticate(curve, sk)) {
 		t.Error("Key Authentication failed")
 	}
 	d := make([]byte, 64)
@@ -84,26 +84,26 @@ func TestSingleSigner(t *testing.T) {
 	}
 	sig := Sign(curve, sk, d)
 	if !Verify(curve, vk, d, sig) {
-		t.Error("Signature verification failed")
+		t.Error("Point1 verification failed")
 	}
 
-	sigTmp := curve.CopyG1(sig)
-	sigTmp, _ = curve.G1Add(sigTmp, curve.GetG1())
+	sigTmp := sig.Copy()
+	sigTmp, _ = sigTmp.Add(curve.GetG1())
 	sig2 := sigTmp
 	if Verify(curve, vk, d, sig2) {
-		t.Error("Signature verification succeeding when it shouldn't")
+		t.Error("Point1 verification succeeding when it shouldn't")
 	}
 
 	// TODO Add tests to show that this doesn't succeed if d or vk is altered
 }
 
 func TestAggregation(t *testing.T) {
-	curve := Altbn128Inst
+	curve := Altbn128
 	N := 6
 	Size := 32
 	msgs := make([][]byte, N+1)
-	sigs := make([]Signature, N+1)
-	pubkeys := make([]VerifyKey, N+1)
+	sigs := make([]Point1, N+1)
+	pubkeys := make([]Point2, N+1)
 	for i := 0; i < N; i++ {
 		msgs[i] = make([]byte, Size)
 		_, _ = rand.Read(msgs[i])
@@ -113,53 +113,53 @@ func TestAggregation(t *testing.T) {
 		pubkeys[i] = vk
 		sigs[i] = sig
 	}
-	aggSig := Aggregate(curve, sigs[:N])
+	aggSig := AggregateG1(sigs[:N])
 	if !VerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N], false) {
-		t.Error("Aggregate Signature verification failed")
+		t.Error("Aggregate Point1 verification failed")
 	}
 	if VerifyAggregateSignature(curve, aggSig, pubkeys[:N-1], msgs[:N], false) {
-		t.Error("Aggregate Signature verification succeeding without enough pubkeys")
+		t.Error("Aggregate Point1 verification succeeding without enough pubkeys")
 	}
 	skf, vkf, _ := KeyGen(curve)
 	pubkeys[N] = vkf
 	sigs[N] = Sign(curve, skf, msgs[0])
 	msgs[N] = msgs[0]
-	aggSig = Aggregate(curve, sigs)
+	aggSig = AggregateG1(sigs)
 	if VerifyAggregateSignature(curve, aggSig, pubkeys, msgs, false) {
-		t.Error("Aggregate Signature succeeding with duplicate messages with allow duplicates being false")
+		t.Error("Aggregate Point1 succeeding with duplicate messages with allow duplicates being false")
 	}
 	if !VerifyAggregateSignature(curve, aggSig, pubkeys, msgs, true) {
-		t.Error("Aggregate Signature failing with duplicate messages with allow duplicates")
+		t.Error("Aggregate Point1 failing with duplicate messages with allow duplicates")
 	}
 	if VerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N], false) {
-		t.Error("Aggregate Signature succeeding with invalid signature")
+		t.Error("Aggregate Point1 succeeding with invalid signature")
 	}
 	msgs[0] = msgs[1]
 	msgs[1] = msgs[N]
-	aggSig = Aggregate(curve, sigs[:N])
+	aggSig = AggregateG1(sigs[:N])
 	if VerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N], false) {
-		t.Error("Aggregate Signature succeeded with messages 0 and 1 switched")
+		t.Error("Aggregate Point1 succeeded with messages 0 and 1 switched")
 	}
 
 	// TODO Add tests to make sure there is no mutation
 }
 
 func TestMultiSig(t *testing.T) {
-	curve := Altbn128Inst
+	curve := Altbn128
 	Tests := 5
 	Size := 32
 	Signers := 10
 	for i := 0; i < Tests; i++ {
 		msg := make([]byte, Size)
 		_, _ = rand.Read(msg)
-		signers := make([]VerifyKey, Signers)
-		sigs := make([]Signature, Signers)
+		signers := make([]Point2, Signers)
+		sigs := make([]Point1, Signers)
 		for j := 0; j < Signers; j++ {
 			sk, vk, _ := KeyGen(curve)
 			sigs[j] = Sign(curve, sk, msg)
 			signers[j] = vk
 		}
-		aggSig := Aggregate(curve, sigs)
+		aggSig := AggregateG1(sigs)
 		if !VerifyMultiSignature(curve, aggSig, signers, msg) {
 			t.Error("Aggregate MultiSig verification failed")
 		}
@@ -178,7 +178,7 @@ func TestMultiSig(t *testing.T) {
 
 func BenchmarkKeygen(b *testing.B) {
 	b.ResetTimer()
-	curve := Altbn128Inst
+	curve := Altbn128
 	for i := 0; i < b.N; i++ {
 		_, _, res := KeyGen(curve)
 		if res != nil {
@@ -188,7 +188,7 @@ func BenchmarkKeygen(b *testing.B) {
 }
 
 func BenchmarkAltBnHashToCurve(b *testing.B) {
-	curve := Altbn128Inst
+	curve := Altbn128
 	ms := make([][]byte, b.N)
 	for i := 0; i < b.N; i++ {
 		ms[i] = make([]byte, 64)
@@ -201,8 +201,8 @@ func BenchmarkAltBnHashToCurve(b *testing.B) {
 }
 
 func BenchmarkSigning(b *testing.B) {
-	curve := Altbn128Inst
-	sks := make([]SigningKey, b.N)
+	curve := Altbn128
+	sks := make([]*big.Int, b.N)
 	ms := make([][]byte, b.N)
 	for i := 0; i < b.N; i++ {
 		ms[i] = make([]byte, 64)
@@ -217,7 +217,7 @@ func BenchmarkSigning(b *testing.B) {
 }
 
 func BenchmarkVerification(b *testing.B) {
-	curve := Altbn128Inst
+	curve := Altbn128
 	message := make([]byte, 64)
 	_, _ = rand.Read(message)
 	sk, vk, _ := KeyGen(curve)
@@ -230,14 +230,14 @@ func BenchmarkVerification(b *testing.B) {
 	}
 }
 
-var vks []VerifyKey
-var sgs []Signature
+var vks []Point2
+var sgs []Point1
 var msg []byte
 
 func TestMain(m *testing.M) {
-	curve := Altbn128Inst
-	vks = make([]VerifyKey, 2048)
-	sgs = make([]Signature, 2048)
+	curve := Altbn128
+	vks = make([]Point2, 2048)
+	sgs = make([]Point1, 2048)
 	msg = make([]byte, 64)
 	_, _ = rand.Read(msg)
 	for i := 0; i < 2048; i++ {
@@ -248,21 +248,63 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func TestMarshal(t *testing.T) {
+	curve := Altbn128
+	marshalled := curve.GetG1().Marshal()
+	if g1, ok := curve.UnmarshalG1(marshalled); ok {
+		if !g1.Equals(curve.GetG1()) {
+			t.Error("Unmarshalling G1 is not consistent with Marshal G1")
+		}
+	} else {
+		t.Error("Unmarshalling G1 failed")
+	}
+	marshalled = marshalled[1:]
+	if _, ok := curve.UnmarshalG1(marshalled); ok {
+		t.Error("Unmarshalling G1 is succeeding when the byte array is of the wrong length")
+	}
+
+	marshalled = curve.GetG2().Marshal()
+	if g2, ok := curve.UnmarshalG2(marshalled); ok {
+		if !g2.Equals(curve.GetG2()) {
+			t.Error("Unmarshalling G2 is not consistent with Marshal G2")
+		}
+	} else {
+		t.Error("Unmarshalling G2 failed")
+	}
+	marshalled = marshalled[1:]
+	if _, ok := curve.UnmarshalG2(marshalled); ok {
+		t.Error("Unmarshalling G2 is succeeding when the byte array is of the wrong length")
+	}
+
+	marshalled = curve.GetGT().Marshal()
+	if gT, ok := curve.UnmarshalGT(marshalled); ok {
+		if !gT.Equals(curve.GetGT()) {
+			t.Error("Unmarshalling GT is not consistent with Marshal GT")
+		}
+	} else {
+		t.Error("Unmarshalling GT failed")
+	}
+	marshalled = marshalled[1:]
+	if _, ok := curve.UnmarshalGT(marshalled); ok {
+		t.Error("Unmarshalling GT is succeeding when the byte array is of the wrong length")
+	}
+}
+
 func TestKnownCases(t *testing.T) {
-	curve := Altbn128Inst
+	curve := Altbn128
 	N := 3
 	msgs := make([][]byte, N)
 	msg1 := []byte{65, 20, 86, 143, 250}
 	msg2 := []byte{157, 76, 30, 64, 128}
 	msg3 := []byte{202, 255, 227, 59, 238}
-	x1, _ := new(big.Int).SetString("7830752896741750908830464020410322281763657818307273013205711220156049734883", 10)
-	x2, _ := new(big.Int).SetString("10065703961787583059826108098259128135713944641698809475150397710106034167549", 10)
-	x3, _ := new(big.Int).SetString("17145080297596291172729378766677038070724014074212589728874454474449054012678", 10)
+	sk1, _ := new(big.Int).SetString("7830752896741750908830464020410322281763657818307273013205711220156049734883", 10)
+	sk2, _ := new(big.Int).SetString("10065703961787583059826108098259128135713944641698809475150397710106034167549", 10)
+	sk3, _ := new(big.Int).SetString("17145080297596291172729378766677038070724014074212589728874454474449054012678", 10)
 
-	pubkeys := make([]VerifyKey, N)
-	sk1, vk1 := LoadKey(curve, x1)
-	sk2, vk2 := LoadKey(curve, x2)
-	sk3, vk3 := LoadKey(curve, x3)
+	pubkeys := make([]Point2, N)
+	vk1 := LoadPublicKey(curve, sk1)
+	vk2 := LoadPublicKey(curve, sk2)
+	vk3 := LoadPublicKey(curve, sk3)
 	msgs[0] = msg1
 	msgs[1] = msg2
 	msgs[2] = msg3
@@ -284,11 +326,11 @@ func TestKnownCases(t *testing.T) {
 	sigChk2, _ := curve.MakeG1Point(sigVal2_1, sigVal2_2)
 	sigChk3, _ := curve.MakeG1Point(sigVal3_1, sigVal3_2)
 
-	if !curve.G1Equals(sigChk1, sigGen1) || !curve.G1Equals(sigChk2, sigGen2) || !curve.G1Equals(sigChk3, sigGen3) {
+	if !sigChk1.Equals(sigGen1) || !sigChk2.Equals(sigGen2) || !sigChk3.Equals(sigGen3) {
 		t.Error("Recreating message signatures from known test cases failed")
 	}
 
-	sigs := make([]Signature, N)
+	sigs := make([]Point1, N)
 	sigs[0] = sigGen1
 	sigs[1] = sigGen2
 	sigs[2] = sigGen3
@@ -297,18 +339,18 @@ func TestKnownCases(t *testing.T) {
 	aggSig2, _ := new(big.Int).SetString("5755139208159515629159661524903000057840676877654799839167369795924360592246", 10)
 	aggSigChk, _ := curve.MakeG1Point(aggSig1, aggSig2)
 
-	aggSig := Aggregate(curve, sigs)
-	if !curve.G1Equals(aggSigChk, aggSig) {
-		t.Error("Aggregate signature does not match the known test case.")
+	aggSig := AggregateG1(sigs)
+	if !aggSigChk.Equals(aggSig) {
+		t.Error("Aggregate Point1 does not match the known test case.")
 	}
 	if !VerifyAggregateSignature(curve, aggSig, pubkeys, msgs, false) {
-		t.Error("Aggregate Signature verification failed")
+		t.Error("Aggregate Point1 verification failed")
 	}
 }
 
 func benchmulti(b *testing.B, k int) {
-	curve := Altbn128Inst
-	multisig := MultiSig{vks[:k], Aggregate(curve, sgs[:k]), msg}
+	curve := Altbn128
+	multisig := MultiSig{vks[:k], AggregateG1(sgs[:k]), msg}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if !multisig.Verify(curve) {
@@ -342,9 +384,9 @@ func BenchmarkMultiVerification2048(b *testing.B) {
 }
 
 func BenchmarkAggregateVerification(b *testing.B) {
-	curve := Altbn128Inst
-	verifkeys := make([]VerifyKey, b.N)
-	sigs := make([]Signature, b.N)
+	curve := Altbn128
+	verifkeys := make([]Point2, b.N)
+	sigs := make([]Point1, b.N)
 	messages := make([][]byte, b.N)
 	for i := 0; i < b.N; i++ {
 		messages[i] = make([]byte, 64)
@@ -353,7 +395,7 @@ func BenchmarkAggregateVerification(b *testing.B) {
 		verifkeys[i] = vk
 		sigs[i] = Sign(curve, sk, messages[i])
 	}
-	aggsig := AggSig{verifkeys, messages, Aggregate(curve, sigs)}
+	aggsig := AggSig{verifkeys, messages, AggregateG1(sigs)}
 	b.ResetTimer()
 	if !aggsig.Verify(curve) {
 		b.Error("Aggregate verificaton failed")
