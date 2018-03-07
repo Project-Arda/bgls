@@ -11,10 +11,10 @@ import (
 // It has everything necessary to support all bgls functionality which we use.
 type CurveSystem interface {
 	MakeG1Point(*big.Int, *big.Int) (Point1, bool)
-	// MakeG2Point(*big.Int, *big.Int) (Point2, bool)
+	// MakeG2Point(*big.Int, *big.Int, *big.Int, *big.Int) (Point2, bool)
 	// MakeGTPoint(*big.Int, *big.Int) (PointT, bool)
 
-	// G2ToAffineCoords(Point2) (*big.Int, *big.Int)
+	//
 	// GTToAffineCoords(PointT) (*big.Int, *big.Int)
 
 	UnmarshalG1([]byte) (Point1, bool)

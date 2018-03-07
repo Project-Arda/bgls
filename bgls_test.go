@@ -60,6 +60,17 @@ func TestEthereumHash(t *testing.T) {
 	pt := curve.HashToG1(a)
 	x2, y2 := pt.ToAffineCoords()
 	assert.True(t, x.Cmp(x2) == 0 && y.Cmp(y2) == 0, "Conversion of point to coordinates is not working")
+
+	xi, xr, yi, yr := altbnG2.ToAffineCoords()
+	knownxi, _ := new(big.Int).SetString("11559732032986387107991004021392285783925812861821192530917403151452391805634", 10)
+	knownxr, _ := new(big.Int).SetString("10857046999023057135944570762232829481370756359578518086990519993285655852781", 10)
+	knownyi, _ := new(big.Int).SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531", 10)
+	knownyr, _ := new(big.Int).SetString("8495653923123431417604973247489272438418190587263600148770280649306958101930", 10)
+
+	assert.Zero(t, xi.Cmp(knownxi), "xi doesn't match")
+	assert.Zero(t, xr.Cmp(knownxr), "xr doesn't match")
+	assert.Zero(t, yi.Cmp(knownyi), "yi doesn't match")
+	assert.Zero(t, yr.Cmp(knownyr), "yr doesn't match")
 }
 
 func TestSingleSigner(t *testing.T) {
@@ -222,40 +233,52 @@ func TestMain(m *testing.M) {
 
 func TestMarshal(t *testing.T) {
 	curve := Altbn128
-	marshalled := curve.GetG1().Marshal()
-	if g1, ok := curve.UnmarshalG1(marshalled); ok {
-		assert.True(t, g1.Equals(curve.GetG1()),
-			"Unmarshalling G1 is not consistent with Marshal G1")
-	} else {
-		t.Error("Unmarshalling G1 failed")
-	}
-	marshalled = marshalled[1:]
-	if _, ok := curve.UnmarshalG1(marshalled); ok {
-		t.Error("Unmarshalling G1 is succeeding when the byte array is of the wrong length")
-	}
+	numTests := 32
+	required_scalars := []*big.Int{one, altbnG1Order}
+	for i := 0; i < numTests; i++ {
+		scalar, _ := rand.Int(rand.Reader, curve.getG1Order())
+		if i < len(required_scalars) {
+			scalar = required_scalars[i]
+		}
 
-	marshalled = curve.GetG2().Marshal()
-	if g2, ok := curve.UnmarshalG2(marshalled); ok {
-		assert.True(t, g2.Equals(curve.GetG2()),
-			"Unmarshalling G2 is not consistent with Marshal G2")
-	} else {
-		t.Error("Unmarshalling G2 failed")
-	}
-	marshalled = marshalled[1:]
-	if _, ok := curve.UnmarshalG2(marshalled); ok {
-		t.Error("Unmarshalling G2 is succeeding when the byte array is of the wrong length")
-	}
+		mulg1 := curve.GetG1().Mul(scalar)
+		marshalled := mulg1.Marshal()
+		if recoveredG1, ok := curve.UnmarshalG1(marshalled); ok {
+			assert.True(t, recoveredG1.Equals(mulg1),
+				"Unmarshalling G1 is not consistent with Marshal G1")
+		} else {
+			t.Error("Unmarshalling G1 failed")
+		}
+		marshalled = marshalled[1:]
+		if _, ok := curve.UnmarshalG1(marshalled); ok {
+			t.Error("Unmarshalling G1 is succeeding when the byte array is of the wrong length")
+		}
 
-	marshalled = curve.GetGT().Marshal()
-	if gT, ok := curve.UnmarshalGT(marshalled); ok {
-		assert.True(t, gT.Equals(curve.GetGT()),
-			"Unmarshalling GT is not consistent with Marshal GT")
-	} else {
-		t.Error("Unmarshalling GT failed")
-	}
-	marshalled = marshalled[1:]
-	if _, ok := curve.UnmarshalGT(marshalled); ok {
-		t.Error("Unmarshalling GT is succeeding when the byte array is of the wrong length")
+		mulg2 := curve.GetG2().Mul(scalar)
+		marshalled = mulg2.Marshal()
+		if recoveredG2, ok := curve.UnmarshalG2(marshalled); ok {
+			assert.True(t, recoveredG2.Equals(mulg2),
+				"Unmarshalling G2 is not consistent with Marshal G2")
+		} else {
+			t.Error("Unmarshalling G2 failed")
+		}
+		marshalled = marshalled[1:]
+		if _, ok := curve.UnmarshalG2(marshalled); ok {
+			t.Error("Unmarshalling G2 is succeeding when the byte array is of the wrong length")
+		}
+
+		mulgT := curve.GetGT().Mul(scalar)
+		marshalled = mulgT.Marshal()
+		if recoveredGT, ok := curve.UnmarshalGT(marshalled); ok {
+			assert.True(t, recoveredGT.Equals(mulgT),
+				"Unmarshalling GT is not consistent with Marshal GT")
+		} else {
+			t.Error("Unmarshalling GT failed")
+		}
+		marshalled = marshalled[1:]
+		if _, ok := curve.UnmarshalGT(marshalled); ok {
+			t.Error("Unmarshalling GT is succeeding when the byte array is of the wrong length")
+		}
 	}
 }
 

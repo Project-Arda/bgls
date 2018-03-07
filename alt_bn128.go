@@ -8,7 +8,7 @@ import (
 	"math/big"
 
 	"github.com/dchest/blake2b"
-	"github.com/ethereum/go-ethereum/crypto/bn256"
+	"github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
 	gosha3 "github.com/ethereum/go-ethereum/crypto/sha3"
 	"golang.org/x/crypto/sha3"
 )
@@ -38,8 +38,10 @@ func (curve *altbn128) MakeG1Point(x, y *big.Int) (Point1, bool) {
 	ret := make([]byte, 64)
 	copy(ret[32-len(xBytes):], xBytes)
 	copy(ret[64-len(yBytes):], yBytes)
-	result, ok := new(bn256.G1).Unmarshal(ret)
-	if !ok {
+	result := new(bn256.G1)
+	var ok error
+	_, ok = result.Unmarshal(ret)
+	if ok != nil {
 		return nil, false
 	}
 	return &altbn128Point1{result}, true
@@ -55,8 +57,9 @@ func (g1Point *altbn128Point1) Add(otherPoint1 Point1) (Point1, bool) {
 }
 
 func (g1Point *altbn128Point1) Copy() Point1 {
-	p, _ := new(bn256.G1).Unmarshal(g1Point.point.Marshal())
-	return &altbn128Point1{p}
+	result := new(bn256.G1)
+	result.Unmarshal(g1Point.point.Marshal())
+	return &altbn128Point1{result}
 }
 
 func (g1Point *altbn128Point1) Equals(otherPoint1 Point1) bool {
@@ -67,7 +70,21 @@ func (g1Point *altbn128Point1) Equals(otherPoint1 Point1) bool {
 }
 
 func (g1Point *altbn128Point1) Marshal() []byte {
-	return g1Point.point.Marshal()
+	x, y := g1Point.ToAffineCoords()
+	xBytes := x.Bytes()
+	if len(xBytes) < 32 {
+		offset := 32 - len(xBytes)
+		rawBytes := make([]byte, 32, 32)
+		for i := 0; i < len(xBytes); i++ {
+			rawBytes[i+offset] = xBytes[i]
+		}
+		xBytes = rawBytes
+	}
+	y.Mul(y, two)
+	if y.Cmp(altbnG1Q) == 1 {
+		xBytes[0] += 128
+	}
+	return xBytes
 }
 
 func (g1Point *altbn128Point1) Mul(scalar *big.Int) Point1 {
@@ -86,7 +103,7 @@ func (g1Point *altbn128Point1) Pair(g2Point Point2) (PointT, bool) {
 }
 
 func (g1Point *altbn128Point1) ToAffineCoords() (x, y *big.Int) {
-	Bytestream := g1Point.Marshal()
+	Bytestream := g1Point.point.Marshal()
 	xBytes, yBytes := Bytestream[:32], Bytestream[32:64]
 	x = new(big.Int).SetBytes(xBytes)
 	y = new(big.Int).SetBytes(yBytes)
@@ -94,14 +111,8 @@ func (g1Point *altbn128Point1) ToAffineCoords() (x, y *big.Int) {
 }
 
 // AltbnG2ToCoord takes a point in G2 of Altbn_128, and returns its affine coordinates
-func (curve *altbn128) MakeG2Point(pt *bn256.G2) (xx, xy, yx, yy *big.Int) {
-	Bytestream := pt.Marshal()
-	xxBytes, xyBytes, yxBytes, yyBytes := Bytestream[:32], Bytestream[32:64], Bytestream[64:96], Bytestream[96:128]
-	xx = new(big.Int).SetBytes(xxBytes)
-	xy = new(big.Int).SetBytes(xyBytes)
-	yx = new(big.Int).SetBytes(yxBytes)
-	yy = new(big.Int).SetBytes(yyBytes)
-	return
+func (curve *altbn128) MakeG2Point(xx, xy, yx, yy *big.Int) (Point2, bool) {
+	return nil, false
 }
 
 func (g2Point *altbn128Point2) Add(otherPoint2 Point2) (Point2, bool) {
@@ -114,8 +125,9 @@ func (g2Point *altbn128Point2) Add(otherPoint2 Point2) (Point2, bool) {
 }
 
 func (g2Point *altbn128Point2) Copy() Point2 {
-	p, _ := new(bn256.G2).Unmarshal(g2Point.point.Marshal())
-	return &altbn128Point2{p}
+	result := new(bn256.G2)
+	result.Unmarshal(g2Point.point.Marshal())
+	return &altbn128Point2{result}
 }
 
 func (g2Point *altbn128Point2) Equals(otherPoint2 Point2) bool {
@@ -135,6 +147,17 @@ func (g2Point *altbn128Point2) Mul(scalar *big.Int) Point2 {
 	return ret
 }
 
+func (g2Point *altbn128Point2) ToAffineCoords() (xx, xy, yx, yy *big.Int) {
+	Bytestream := g2Point.point.Marshal()
+	xxBytes, xyBytes := Bytestream[:32], Bytestream[32:64]
+	yxBytes, yyBytes := Bytestream[64:96], Bytestream[96:128]
+	xx = new(big.Int).SetBytes(xxBytes)
+	xy = new(big.Int).SetBytes(xyBytes)
+	yx = new(big.Int).SetBytes(yxBytes)
+	yy = new(big.Int).SetBytes(yyBytes)
+	return
+}
+
 func (gTPoint altbn128PointT) Add(otherPointT PointT) (PointT, bool) {
 	if other, ok := (otherPointT).(altbn128PointT); ok {
 		sum := new(bn256.GT).Add(gTPoint.point, other.point)
@@ -145,8 +168,9 @@ func (gTPoint altbn128PointT) Add(otherPointT PointT) (PointT, bool) {
 }
 
 func (gTPoint altbn128PointT) Copy() PointT {
-	p, _ := new(bn256.GT).Unmarshal(gTPoint.point.Marshal())
-	return altbn128PointT{p}
+	result := new(bn256.GT)
+	result.Unmarshal(gTPoint.point.Marshal())
+	return &altbn128PointT{result}
 }
 
 func (gTPoint altbn128PointT) Marshal() []byte {
@@ -167,21 +191,49 @@ func (gTPoint altbn128PointT) Mul(scalar *big.Int) PointT {
 }
 
 func (curve *altbn128) UnmarshalG1(data []byte) (Point1, bool) {
-	if data == nil || len(data) != 64 {
+	if data == nil || (len(data) != 64 && len(data) != 32) {
 		return nil, false
 	}
-	if curvePoint, ok := new(bn256.G1).Unmarshal(data); ok {
-		return &altbn128Point1{curvePoint}, true
+	if len(data) == 64 { // No point compression
+		curvePoint := new(bn256.G1)
+		if _, ok := curvePoint.Unmarshal(data); ok == nil {
+			return &altbn128Point1{curvePoint}, true
+		}
+	} else if len(data) == 32 { // Point compression
+		ySgn := (data[0] >= 128)
+		if ySgn {
+			data[0] -= 128
+		}
+		x := new(big.Int).SetBytes(data)
+		if x.Cmp(zero) == 0 {
+			return Altbn128.MakeG1Point(zero, zero)
+		}
+		y := Altbn128.g1XToYSquared(x)
+		if !isQuadRes(y, altbnG1Q) { // Ensure y is on the curve
+			return nil, false
+		}
+		y = calcQuadRes(y, altbnG1Q)
+		doubleY := new(big.Int).Mul(y, two)
+		cmpRes := doubleY.Cmp(altbnG1Q)
+		if ySgn && cmpRes == -1 {
+			y.Sub(altbnG1Q, y)
+		} else if !ySgn && cmpRes == 1 {
+			y.Sub(altbnG1Q, y)
+		}
+		return Altbn128.MakeG1Point(x, y)
 	}
 	return nil, false
 }
 
 func (curve *altbn128) UnmarshalG2(data []byte) (Point2, bool) {
-	if data == nil || len(data) != 128 {
+	if data == nil || (len(data) != 64 && len(data) != 128) {
 		return nil, false
 	}
-	if curvePoint, ok := new(bn256.G2).Unmarshal(data); ok {
-		return &altbn128Point2{curvePoint}, true
+	if len(data) == 128 { // No point compression
+		curvePoint := new(bn256.G2)
+		if _, ok := curvePoint.Unmarshal(data); ok == nil {
+			return &altbn128Point2{curvePoint}, true
+		}
 	}
 	return nil, false
 }
@@ -190,7 +242,8 @@ func (curve *altbn128) UnmarshalGT(data []byte) (PointT, bool) {
 	if data == nil || len(data) != 384 {
 		return nil, false
 	}
-	if curvePoint, ok := new(bn256.GT).Unmarshal(data); ok {
+	curvePoint := new(bn256.GT)
+	if _, ok := curvePoint.Unmarshal(data); ok == nil {
 		return altbn128PointT{curvePoint}, true
 	}
 	return nil, false
