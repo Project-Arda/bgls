@@ -5,6 +5,7 @@ package bgls
 
 import (
 	"bytes"
+	"fmt"
 	"math/big"
 
 	"github.com/dchest/blake2b"
@@ -115,8 +116,8 @@ func (g1Point *altbn128Point1) ToAffineCoords() (x, y *big.Int) {
 
 // MakeG2Point copies points into []byte and unmarshals to get around twistPoint not being exported
 func (curve *altbn128) MakeG2Point(xx, xy, yx, yy *big.Int) (Point2, bool) {
-	xxBytes, xyBytes := xx.Bytes(), xy.Bytes()
-	yxBytes, yyBytes := yx.Bytes(), yy.Bytes()
+	xxBytes, xyBytes := pad32Bytes(xx.Bytes()), pad32Bytes(xy.Bytes())
+	yxBytes, yyBytes := pad32Bytes(yx.Bytes()), pad32Bytes(yy.Bytes())
 	ret := make([]byte, 128)
 	copy(ret[:32], xxBytes)
 	copy(ret[32:], xyBytes)
@@ -126,6 +127,8 @@ func (curve *altbn128) MakeG2Point(xx, xy, yx, yy *big.Int) (Point2, bool) {
 	var ok error
 	_, ok = result.Unmarshal(ret)
 	if ok != nil {
+		fmt.Println(ok)
+		fmt.Println(len(xxBytes), len(xyBytes), len(yxBytes), len(yyBytes))
 		return nil, false
 	}
 	return &altbn128Point2{result}, true
@@ -154,7 +157,23 @@ func (g2Point *altbn128Point2) Equals(otherPoint2 Point2) bool {
 }
 
 func (g2Point *altbn128Point2) Marshal() []byte {
-	return g2Point.point.Marshal()
+	xi, xr, yi, yr := g2Point.ToAffineCoords()
+	xiBytes := pad32Bytes(xi.Bytes())
+	xrBytes := pad32Bytes(xr.Bytes())
+	y2 := &complexNum{yi, yr}
+	y2.Exp(y2, two, altbnG1Q)
+	yi.Mul(yi, two)
+	yr.Mul(yr, two)
+	if yi.Cmp(altbnG1Q) == 1 {
+		xiBytes[0] += 128
+	}
+	if yr.Cmp(altbnG1Q) == 1 {
+		xrBytes[0] += 128
+	}
+	xBytes := make([]byte, 64, 64)
+	copy(xBytes[:32], xiBytes)
+	copy(xBytes[32:], xrBytes)
+	return xBytes
 }
 
 func (g2Point *altbn128Point2) Mul(scalar *big.Int) Point2 {
@@ -248,6 +267,41 @@ func (curve *altbn128) UnmarshalG2(data []byte) (Point2, bool) {
 		if _, ok := curvePoint.Unmarshal(data); ok == nil {
 			return &altbn128Point2{curvePoint}, true
 		}
+	} else if len(data) == 64 { // Point compression
+		xiBytes := data[:32]
+		xrBytes := data[32:]
+		yiSgn := (xiBytes[0] >= 128)
+		yrSgn := (xrBytes[0] >= 128)
+		if yiSgn {
+			xiBytes[0] -= 128
+		}
+		if yrSgn {
+			xrBytes[0] -= 128
+		}
+		xi := new(big.Int).SetBytes(xiBytes)
+		xr := new(big.Int).SetBytes(xrBytes)
+		if xi.Cmp(zero) == 0 && xr.Cmp(zero) == 0 {
+			return Altbn128.MakeG2Point(zero, zero, zero, zero)
+		}
+		x := &complexNum{xi, xr}
+		y := Altbn128.g2XToYSquared(x)
+		// Underlying library already checks that y is on the curve, thus isQuadRes isn't checked here
+		y = calcComplexQuadRes(y, altbnG1Q)
+		doubleYRe := new(big.Int).Mul(y.re, two)
+		doubleYIm := new(big.Int).Mul(y.im, two)
+		cmpResRe := doubleYRe.Cmp(altbnG1Q)
+		cmpResIm := doubleYIm.Cmp(altbnG1Q)
+		if yiSgn && cmpResIm == -1 {
+			y.im.Sub(altbnG1Q, y.im)
+		} else if !yiSgn && cmpResIm == 1 {
+			y.im.Sub(altbnG1Q, y.im)
+		}
+		if yrSgn && cmpResRe == -1 {
+			y.re.Sub(altbnG1Q, y.re)
+		} else if !yrSgn && cmpResRe == 1 {
+			y.re.Sub(altbnG1Q, y.re)
+		}
+		return Altbn128.MakeG2Point(x.im, x.re, y.im, y.re)
 	}
 	return nil, false
 }
@@ -286,6 +340,13 @@ func (curve *altbn128) g1XToYSquared(x *big.Int) *big.Int {
 	return result
 }
 
+func (curve *altbn128) g2XToYSquared(x *complexNum) *complexNum {
+	result := getComplexZero()
+	result.Exp(x, three, altbnG1Q)
+	result.Add(result, altbnG2B, altbnG1Q)
+	return result
+}
+
 func (curve *altbn128) GetG1() Point1 {
 	return altbnG1
 }
@@ -301,6 +362,10 @@ func (curve *altbn128) GetGT() PointT {
 //curve specific constants
 var altbnG1B = big.NewInt(3)
 var altbnG1Q, _ = new(big.Int).SetString("21888242871839275222246405745257275088696311157297823662689037894645226208583", 10)
+
+var altbnG2BRe, _ = new(big.Int).SetString("19485874751759354771024239261021720505790618469301721065564631296452457478373", 10)
+var altbnG2BIm, _ = new(big.Int).SetString("266929791119991161246907387137283842545076965332900288569378510910307636690", 10)
+var altbnG2B = &complexNum{altbnG2BIm, altbnG2BRe}
 
 //precomputed Z = (-1 + sqrt(-3))/2 in Fq
 var altbnZ, _ = new(big.Int).SetString("2203960485148121921418603742825762020974279258880205651966", 10)
