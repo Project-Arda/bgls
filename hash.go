@@ -92,6 +92,39 @@ func calcQuadRes(ySqr *big.Int, q *big.Int) *big.Int {
 	return zero
 }
 
+// Currently implementing method from Guide to Pairing Based Cryptography, Ch 5 algorithm 18.
+// This in turn is cited from "Gora Adj and Francisco Rodriguez-Henriquez.
+// Square root computation over even extension fields.
+// IEEE Transactions on Computers, 63(11):2829-2841, 2014"
+func calcComplexQuadRes(ySqr *complexNum, q *big.Int) *complexNum {
+	result := getComplexZero()
+	if ySqr.im.Cmp(zero) == 0 {
+		result.re = calcQuadRes(ySqr.re, q)
+		return result
+	}
+	lambda := new(big.Int).Exp(ySqr.re, two, q)
+	lambda.Add(lambda, new(big.Int).Exp(ySqr.im, two, q))
+	lambda = calcQuadRes(lambda, q)
+	invtwo := new(big.Int).ModInverse(two, q)
+	delta := new(big.Int).Add(ySqr.re, lambda)
+	delta.Mod(delta, q)
+	delta.Mul(delta, invtwo)
+	delta.Mod(delta, q)
+	if !isQuadRes(delta, q) {
+		delta = new(big.Int).Sub(ySqr.re, lambda)
+		delta.Mul(delta, invtwo)
+		delta.Mod(delta, q)
+	}
+	result.re = calcQuadRes(delta, q)
+	invRe := new(big.Int).ModInverse(result.re, q)
+	result.im.Mul(invRe, invtwo)
+	result.im.Mod(result.im, q)
+	result.im.Mul(result.im, ySqr.im)
+	result.im.Mod(result.im, q)
+	result.re.Mod(result.re, q)
+	return result
+}
+
 // Implement Eulers Criterion
 func isQuadRes(a *big.Int, q *big.Int) bool {
 	if a.Cmp(zero) == 0 {

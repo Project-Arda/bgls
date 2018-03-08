@@ -11,10 +11,10 @@ import (
 // It has everything necessary to support all bgls functionality which we use.
 type CurveSystem interface {
 	MakeG1Point(*big.Int, *big.Int) (Point1, bool)
-	// MakeG2Point(*big.Int, *big.Int) (Point2, bool)
+	// MakeG2Point(*big.Int, *big.Int, *big.Int, *big.Int) (Point2, bool)
 	// MakeGTPoint(*big.Int, *big.Int) (PointT, bool)
 
-	// G2ToAffineCoords(Point2) (*big.Int, *big.Int)
+	//
 	// GTToAffineCoords(PointT) (*big.Int, *big.Int)
 
 	UnmarshalG1([]byte) (Point1, bool)
@@ -28,7 +28,6 @@ type CurveSystem interface {
 	HashToG1(message []byte) Point1
 
 	getG1Q() *big.Int
-	getG2Q() *big.Int
 	// getGTQ() *big.Int
 
 	getG1A() *big.Int
@@ -55,7 +54,7 @@ type Point2 interface {
 	Equals(Point2) bool
 	Marshal() []byte
 	Mul(*big.Int) Point2
-	// ToAffineCoords() (*big.Int, *big.Int)
+	ToAffineCoords() (*big.Int, *big.Int, *big.Int, *big.Int)
 }
 
 // PointT is a way to represent a point on GT, in the first elliptic curve.

@@ -25,50 +25,39 @@ The generator `g_2` is defined as: `(1155973203298638710799100402139228578392581
 The identity element for both groups (The point at infinity in affine space) is internally represented as `(0,0)`
 
 ## Benchmarks
-The following benchmarks are from a 3.80GHz i7-7700HQ CPU with 16GB ram.
+The following benchmarks are from a 3.80GHz i7-7700HQ CPU with 16GB ram. Note that all code is running on a single core.
 
-For reference, the pairing operation (the slowest operation involved) takes ~14 milliseconds.
+For reference, the pairing operation (the slowest operation involved) takes ~1.6 milliseconds.
 ```
-$ go test github.com/ethereum/go-ethereum/crypto/bn256 -bench .
-BenchmarkPairing-8   	     100	  13845045 ns/op
+BenchmarkG1-8        	   10000	    141018 ns/op
+BenchmarkG2-8        	    3000	    471002 ns/op
+BenchmarkPairing-8   	    1000	   1609893 ns/op
 PASS
-ok  	github.com/ethereum/go-ethereum/crypto/bn256	1.842s
+ok  	github.com/ethereum/go-ethereum/crypto/bn256/cloudflare	4.725s
 ```
-- `Signing` ~2 milliseconds
-- `Signature verification` ~30 milliseconds, using two pairings.
-- `Multi Signature verification` ~30 milliseconds + ~60 microseconds per signer, two pairings + n point additions
-- `Aggregate Signature verification` ~15 milliseconds per signer/message pair, with n+1 pairings.
+
+- `Signing` ~.25 milliseconds
+- `Signature verification` ~3.4 milliseconds, using two pairings.
+- `Multi Signature verification` ~3.7 milliseconds + ~2 microseconds per signer, two pairings + n point additions
+- `Aggregate Signature verification` ~.2 milliseconds per signer/message pair, with n+1 pairings.
 
 ```
 $ go test github.com/jlandrews/bgls -v -bench .
-=== RUN   TestAltbnHashToCurve
---- PASS: TestAltbnHashToCurve (0.01s)
-=== RUN   TestEthereumHash
---- PASS: TestEthereumHash (0.00s)
-=== RUN   TestSingleSigner
---- PASS: TestSingleSigner (0.10s)
-=== RUN   TestAggregation
---- PASS: TestAggregation (0.48s)
-=== RUN   TestMultiSig
---- PASS: TestMultiSig (0.81s)
-=== RUN   TestKnownCases
---- PASS: TestKnownCases (0.08s)
-BenchmarkKeygen-8                  	     300	   4610235 ns/op
-BenchmarkAltBnHashToCurve-8        	   20000	     91348 ns/op
-BenchmarkSigning-8                 	    1000	   2201775 ns/op
-BenchmarkVerification-8            	      50	  30001975 ns/op
-BenchmarkMultiVerification64-8     	      50	  32210135 ns/op
-BenchmarkMultiVerification128-8    	      50	  33022116 ns/op
-BenchmarkMultiVerification256-8    	      50	  37648131 ns/op
-BenchmarkMultiVerification512-8    	      30	  45162677 ns/op
-BenchmarkMultiVerification1024-8   	      20	  59932214 ns/op
-BenchmarkMultiVerification2048-8   	      20	  90268680 ns/op
-BenchmarkAggregateVerification-8   	     100	  15534821 ns/op
+BenchmarkKeygen-8                  	    3000	    465450 ns/op
+BenchmarkAltBnHashToCurve-8        	   10000	    101616 ns/op
+BenchmarkSigning-8                 	    5000	    250310 ns/op
+BenchmarkVerification-8            	     500	   3269717 ns/op
+BenchmarkMultiVerification64-8     	     500	   3878868 ns/op
+BenchmarkMultiVerification128-8    	     300	   3989605 ns/op
+BenchmarkMultiVerification256-8    	     300	   4326581 ns/op
+BenchmarkMultiVerification512-8    	     300	   4865951 ns/op
+BenchmarkMultiVerification1024-8   	     200	   5961354 ns/op
+BenchmarkMultiVerification2048-8   	     200	   8321105 ns/op
+BenchmarkAggregateVerification-8   	    1000	   1711109 ns/op
 PASS
-ok  	github.com/jlandrews/bgls	42.092s
-
+ok  	github.com/jlandrews/bgls	27.739s
 ```
-For comparison, the ed25519 implementation in go yields much faster key generation signing and single signature verification. At ~145 microseconds per verification, the multi signature verification is actually faster beyond ~350 signatures.
+For comparison, the ed25519 implementation in go yields much faster key generation signing and single signature verification. However, at ~145 microseconds per verification, the multi signature verification is actually faster beyond ~26 signatures.
 ```
 $ go test golang.org/x/crypto/ed25519 -bench .
 BenchmarkKeyGeneration-8   	   30000	     51878 ns/op
