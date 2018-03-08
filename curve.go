@@ -28,7 +28,6 @@ type CurveSystem interface {
 	HashToG1(message []byte) Point1
 
 	getG1Q() *big.Int
-	getG2Q() *big.Int
 	// getGTQ() *big.Int
 
 	getG1A() *big.Int
@@ -55,7 +54,7 @@ type Point2 interface {
 	Equals(Point2) bool
 	Marshal() []byte
 	Mul(*big.Int) Point2
-	// ToAffineCoords() (*big.Int, *big.Int)
+	ToAffineCoords() (*big.Int, *big.Int, *big.Int, *big.Int)
 }
 
 // PointT is a way to represent a point on GT, in the first elliptic curve.

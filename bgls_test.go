@@ -71,6 +71,9 @@ func TestEthereumHash(t *testing.T) {
 	assert.Zero(t, xr.Cmp(knownxr), "xr doesn't match")
 	assert.Zero(t, yi.Cmp(knownyi), "yi doesn't match")
 	assert.Zero(t, yr.Cmp(knownyr), "yr doesn't match")
+
+	altG2, _ := curve.MakeG2Point(xi, xr, yi, yr)
+	assert.True(t, altG2.Equals(curve.GetG2()), "MakeG2Point Failed")
 }
 
 func TestSingleSigner(t *testing.T) {
@@ -159,6 +162,103 @@ func TestMultiSig(t *testing.T) {
 	}
 }
 
+func TestMarshal(t *testing.T) {
+	curve := Altbn128
+	numTests := 32
+	required_scalars := []*big.Int{one, altbnG1Order}
+	for i := 0; i < numTests; i++ {
+		scalar, _ := rand.Int(rand.Reader, curve.getG1Order())
+		if i < len(required_scalars) {
+			scalar = required_scalars[i]
+		}
+
+		mulg1 := curve.GetG1().Mul(scalar)
+		marshalled := mulg1.Marshal()
+		if recoveredG1, ok := curve.UnmarshalG1(marshalled); ok {
+			assert.True(t, recoveredG1.Equals(mulg1),
+				"Unmarshalling G1 is not consistent with Marshal G1")
+		} else {
+			t.Error("Unmarshalling G1 failed")
+		}
+		marshalled = marshalled[1:]
+		if _, ok := curve.UnmarshalG1(marshalled); ok {
+			t.Error("Unmarshalling G1 is succeeding when the byte array is of the wrong length")
+		}
+
+		mulg2 := curve.GetG2().Mul(scalar)
+		marshalled = mulg2.Marshal()
+		if recoveredG2, ok := curve.UnmarshalG2(marshalled); ok {
+			assert.True(t, recoveredG2.Equals(mulg2),
+				"Unmarshalling G2 is not consistent with Marshal G2")
+		} else {
+			t.Error("Unmarshalling G2 failed on scalar " + scalar.String())
+		}
+		marshalled = marshalled[1:]
+		if _, ok := curve.UnmarshalG2(marshalled); ok {
+			t.Error("Unmarshalling G2 is succeeding when the byte array is of the wrong length")
+		}
+
+		mulgT := curve.GetGT().Mul(scalar)
+		marshalled = mulgT.Marshal()
+		if recoveredGT, ok := curve.UnmarshalGT(marshalled); ok {
+			assert.True(t, recoveredGT.Equals(mulgT),
+				"Unmarshalling GT is not consistent with Marshal GT")
+		} else {
+			t.Error("Unmarshalling GT failed")
+		}
+		marshalled = marshalled[1:]
+		if _, ok := curve.UnmarshalGT(marshalled); ok {
+			t.Error("Unmarshalling GT is succeeding when the byte array is of the wrong length")
+		}
+	}
+}
+
+func TestKnownCases(t *testing.T) {
+	curve := Altbn128
+	N := 3
+	msgs := make([][]byte, N)
+	msg1 := []byte{65, 20, 86, 143, 250}
+	msg2 := []byte{157, 76, 30, 64, 128}
+	msg3 := []byte{202, 255, 227, 59, 238}
+	sk1, _ := new(big.Int).SetString("7830752896741750908830464020410322281763657818307273013205711220156049734883", 10)
+	sk2, _ := new(big.Int).SetString("10065703961787583059826108098259128135713944641698809475150397710106034167549", 10)
+	sk3, _ := new(big.Int).SetString("17145080297596291172729378766677038070724014074212589728874454474449054012678", 10)
+
+	pubkeys := make([]Point2, N)
+	vk1, vk2, vk3 := LoadPublicKey(curve, sk1), LoadPublicKey(curve, sk2), LoadPublicKey(curve, sk3)
+	msgs[0], msgs[1], msgs[2] = msg1, msg2, msg3
+	pubkeys[0], pubkeys[1], pubkeys[2] = vk1, vk2, vk3
+
+	sigGen1 := Sign(curve, sk1, msgs[0])
+	sigGen2 := Sign(curve, sk2, msgs[1])
+	sigGen3 := Sign(curve, sk3, msgs[2])
+	sigVal1_1, _ := new(big.Int).SetString("21637350149051642305293442272499488026428127697128429631193536777535027009518", 10)
+	sigVal1_2, _ := new(big.Int).SetString("149479762519169687769683150632580363857094522511606512652585818657412262489", 10)
+	sigVal2_1, _ := new(big.Int).SetString("14834848655731874780751719195269704123719987185153910215596714529658047741046", 10)
+	sigVal2_2, _ := new(big.Int).SetString("5847895190688397897156144807293187828750812390735163763226617490736304595451", 10)
+	sigVal3_1, _ := new(big.Int).SetString("21239057713889019692075876723610689006006025737755828182426488764514117409847", 10)
+	sigVal3_2, _ := new(big.Int).SetString("11967902298809667109716532536825395835657143208987520118971083760489593281874", 10)
+	sigChk1, _ := curve.MakeG1Point(sigVal1_1, sigVal1_2)
+	sigChk2, _ := curve.MakeG1Point(sigVal2_1, sigVal2_2)
+	sigChk3, _ := curve.MakeG1Point(sigVal3_1, sigVal3_2)
+
+	assert.False(t, (!sigChk1.Equals(sigGen1) || !sigChk2.Equals(sigGen2) || !sigChk3.Equals(sigGen3)),
+		"Recreating message signatures from known test cases failed")
+
+	sigs := make([]Point1, N)
+	sigs[0], sigs[1], sigs[2] = sigGen1, sigGen2, sigGen3
+
+	aggSig1, _ := new(big.Int).SetString("12682380538491839124790562586247816360937861029087546329767912056050859037239", 10)
+	aggSig2, _ := new(big.Int).SetString("5755139208159515629159661524903000057840676877654799839167369795924360592246", 10)
+	aggSigChk, _ := curve.MakeG1Point(aggSig1, aggSig2)
+
+	aggSig := AggregateG1(sigs)
+	assert.True(t, aggSigChk.Equals(aggSig),
+		"Aggregate Point1 does not match the known test case.")
+	assert.True(t, VerifyAggregateSignature(curve, aggSig, pubkeys, msgs, false),
+		"Aggregate Point1 verification failed")
+}
+
 func BenchmarkKeygen(b *testing.B) {
 	b.ResetTimer()
 	curve := Altbn128
@@ -229,103 +329,6 @@ func TestMain(m *testing.M) {
 		sgs[i] = Sign(curve, sk, msg)
 	}
 	os.Exit(m.Run())
-}
-
-func TestMarshal(t *testing.T) {
-	curve := Altbn128
-	numTests := 32
-	required_scalars := []*big.Int{one, altbnG1Order}
-	for i := 0; i < numTests; i++ {
-		scalar, _ := rand.Int(rand.Reader, curve.getG1Order())
-		if i < len(required_scalars) {
-			scalar = required_scalars[i]
-		}
-
-		mulg1 := curve.GetG1().Mul(scalar)
-		marshalled := mulg1.Marshal()
-		if recoveredG1, ok := curve.UnmarshalG1(marshalled); ok {
-			assert.True(t, recoveredG1.Equals(mulg1),
-				"Unmarshalling G1 is not consistent with Marshal G1")
-		} else {
-			t.Error("Unmarshalling G1 failed")
-		}
-		marshalled = marshalled[1:]
-		if _, ok := curve.UnmarshalG1(marshalled); ok {
-			t.Error("Unmarshalling G1 is succeeding when the byte array is of the wrong length")
-		}
-
-		mulg2 := curve.GetG2().Mul(scalar)
-		marshalled = mulg2.Marshal()
-		if recoveredG2, ok := curve.UnmarshalG2(marshalled); ok {
-			assert.True(t, recoveredG2.Equals(mulg2),
-				"Unmarshalling G2 is not consistent with Marshal G2")
-		} else {
-			t.Error("Unmarshalling G2 failed")
-		}
-		marshalled = marshalled[1:]
-		if _, ok := curve.UnmarshalG2(marshalled); ok {
-			t.Error("Unmarshalling G2 is succeeding when the byte array is of the wrong length")
-		}
-
-		mulgT := curve.GetGT().Mul(scalar)
-		marshalled = mulgT.Marshal()
-		if recoveredGT, ok := curve.UnmarshalGT(marshalled); ok {
-			assert.True(t, recoveredGT.Equals(mulgT),
-				"Unmarshalling GT is not consistent with Marshal GT")
-		} else {
-			t.Error("Unmarshalling GT failed")
-		}
-		marshalled = marshalled[1:]
-		if _, ok := curve.UnmarshalGT(marshalled); ok {
-			t.Error("Unmarshalling GT is succeeding when the byte array is of the wrong length")
-		}
-	}
-}
-
-func TestKnownCases(t *testing.T) {
-	curve := Altbn128
-	N := 3
-	msgs := make([][]byte, N)
-	msg1 := []byte{65, 20, 86, 143, 250}
-	msg2 := []byte{157, 76, 30, 64, 128}
-	msg3 := []byte{202, 255, 227, 59, 238}
-	sk1, _ := new(big.Int).SetString("7830752896741750908830464020410322281763657818307273013205711220156049734883", 10)
-	sk2, _ := new(big.Int).SetString("10065703961787583059826108098259128135713944641698809475150397710106034167549", 10)
-	sk3, _ := new(big.Int).SetString("17145080297596291172729378766677038070724014074212589728874454474449054012678", 10)
-
-	pubkeys := make([]Point2, N)
-	vk1, vk2, vk3 := LoadPublicKey(curve, sk1), LoadPublicKey(curve, sk2), LoadPublicKey(curve, sk3)
-	msgs[0], msgs[1], msgs[2] = msg1, msg2, msg3
-	pubkeys[0], pubkeys[1], pubkeys[2] = vk1, vk2, vk3
-
-	sigGen1 := Sign(curve, sk1, msgs[0])
-	sigGen2 := Sign(curve, sk2, msgs[1])
-	sigGen3 := Sign(curve, sk3, msgs[2])
-	sigVal1_1, _ := new(big.Int).SetString("21637350149051642305293442272499488026428127697128429631193536777535027009518", 10)
-	sigVal1_2, _ := new(big.Int).SetString("149479762519169687769683150632580363857094522511606512652585818657412262489", 10)
-	sigVal2_1, _ := new(big.Int).SetString("14834848655731874780751719195269704123719987185153910215596714529658047741046", 10)
-	sigVal2_2, _ := new(big.Int).SetString("5847895190688397897156144807293187828750812390735163763226617490736304595451", 10)
-	sigVal3_1, _ := new(big.Int).SetString("21239057713889019692075876723610689006006025737755828182426488764514117409847", 10)
-	sigVal3_2, _ := new(big.Int).SetString("11967902298809667109716532536825395835657143208987520118971083760489593281874", 10)
-	sigChk1, _ := curve.MakeG1Point(sigVal1_1, sigVal1_2)
-	sigChk2, _ := curve.MakeG1Point(sigVal2_1, sigVal2_2)
-	sigChk3, _ := curve.MakeG1Point(sigVal3_1, sigVal3_2)
-
-	assert.False(t, (!sigChk1.Equals(sigGen1) || !sigChk2.Equals(sigGen2) || !sigChk3.Equals(sigGen3)),
-		"Recreating message signatures from known test cases failed")
-
-	sigs := make([]Point1, N)
-	sigs[0], sigs[1], sigs[2] = sigGen1, sigGen2, sigGen3
-
-	aggSig1, _ := new(big.Int).SetString("12682380538491839124790562586247816360937861029087546329767912056050859037239", 10)
-	aggSig2, _ := new(big.Int).SetString("5755139208159515629159661524903000057840676877654799839167369795924360592246", 10)
-	aggSigChk, _ := curve.MakeG1Point(aggSig1, aggSig2)
-
-	aggSig := AggregateG1(sigs)
-	assert.True(t, aggSigChk.Equals(aggSig),
-		"Aggregate Point1 does not match the known test case.")
-	assert.True(t, VerifyAggregateSignature(curve, aggSig, pubkeys, msgs, false),
-		"Aggregate Point1 verification failed")
 }
 
 func benchmulti(b *testing.B, k int) {

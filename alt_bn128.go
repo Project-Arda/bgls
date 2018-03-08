@@ -31,8 +31,7 @@ type altbn128PointT struct {
 // Altbn128Inst is the instance for the altbn128 curve, with all of its functions.
 var Altbn128 = &altbn128{}
 
-// AltbnMkG1Point copies points into []byte and unmarshals to get around curvePoint not being exported
-// This is copied from bn256.G1.Marshal (modified)
+// MakeG1Point copies points into []byte and unmarshals to get around curvePoint not being exported
 func (curve *altbn128) MakeG1Point(x, y *big.Int) (Point1, bool) {
 	xBytes, yBytes := x.Bytes(), y.Bytes()
 	ret := make([]byte, 64)
@@ -64,25 +63,29 @@ func (g1Point *altbn128Point1) Copy() Point1 {
 
 func (g1Point *altbn128Point1) Equals(otherPoint1 Point1) bool {
 	if other, ok := (otherPoint1).(*altbn128Point1); ok {
-		return bytes.Equal(g1Point.Marshal(), other.Marshal())
+		return bytes.Equal(g1Point.point.Marshal(), other.point.Marshal())
 	}
 	return false
 }
 
 func (g1Point *altbn128Point1) Marshal() []byte {
 	x, y := g1Point.ToAffineCoords()
-	xBytes := x.Bytes()
+	xBytes := pad32Bytes(x.Bytes())
+	y.Mul(y, two)
+	if y.Cmp(altbnG1Q) == 1 {
+		xBytes[0] += 128
+	}
+	return xBytes
+}
+
+func pad32Bytes(xBytes []byte) []byte {
 	if len(xBytes) < 32 {
 		offset := 32 - len(xBytes)
 		rawBytes := make([]byte, 32, 32)
 		for i := 0; i < len(xBytes); i++ {
 			rawBytes[i+offset] = xBytes[i]
 		}
-		xBytes = rawBytes
-	}
-	y.Mul(y, two)
-	if y.Cmp(altbnG1Q) == 1 {
-		xBytes[0] += 128
+		return rawBytes
 	}
 	return xBytes
 }
@@ -110,9 +113,22 @@ func (g1Point *altbn128Point1) ToAffineCoords() (x, y *big.Int) {
 	return
 }
 
-// AltbnG2ToCoord takes a point in G2 of Altbn_128, and returns its affine coordinates
+// MakeG2Point copies points into []byte and unmarshals to get around twistPoint not being exported
 func (curve *altbn128) MakeG2Point(xx, xy, yx, yy *big.Int) (Point2, bool) {
-	return nil, false
+	xxBytes, xyBytes := xx.Bytes(), xy.Bytes()
+	yxBytes, yyBytes := yx.Bytes(), yy.Bytes()
+	ret := make([]byte, 128)
+	copy(ret[:32], xxBytes)
+	copy(ret[32:], xyBytes)
+	copy(ret[64:], yxBytes)
+	copy(ret[96:], yyBytes)
+	result := new(bn256.G2)
+	var ok error
+	_, ok = result.Unmarshal(ret)
+	if ok != nil {
+		return nil, false
+	}
+	return &altbn128Point2{result}, true
 }
 
 func (g2Point *altbn128Point2) Add(otherPoint2 Point2) (Point2, bool) {
@@ -132,7 +148,7 @@ func (g2Point *altbn128Point2) Copy() Point2 {
 
 func (g2Point *altbn128Point2) Equals(otherPoint2 Point2) bool {
 	if other, ok := (otherPoint2).(*altbn128Point2); ok {
-		return bytes.Equal(g2Point.Marshal(), other.Marshal())
+		return bytes.Equal(g2Point.point.Marshal(), other.point.Marshal())
 	}
 	return false
 }
@@ -209,9 +225,7 @@ func (curve *altbn128) UnmarshalG1(data []byte) (Point1, bool) {
 			return Altbn128.MakeG1Point(zero, zero)
 		}
 		y := Altbn128.g1XToYSquared(x)
-		if !isQuadRes(y, altbnG1Q) { // Ensure y is on the curve
-			return nil, false
-		}
+		// Underlying library already checks that y is on the curve, thus isQuadRes isn't checked here
 		y = calcQuadRes(y, altbnG1Q)
 		doubleY := new(big.Int).Mul(y, two)
 		cmpRes := doubleY.Cmp(altbnG1Q)
@@ -272,10 +286,6 @@ func (curve *altbn128) g1XToYSquared(x *big.Int) *big.Int {
 	return result
 }
 
-func (curve *altbn128) getG2Q() *big.Int {
-	return altbnG2Q
-}
-
 func (curve *altbn128) GetG1() Point1 {
 	return altbnG1
 }
@@ -291,7 +301,6 @@ func (curve *altbn128) GetGT() PointT {
 //curve specific constants
 var altbnG1B = big.NewInt(3)
 var altbnG1Q, _ = new(big.Int).SetString("21888242871839275222246405745257275088696311157297823662689037894645226208583", 10)
-var altbnG2Q = new(big.Int).Mul(altbnG1Q, altbnG1Q)
 
 //precomputed Z = (-1 + sqrt(-3))/2 in Fq
 var altbnZ, _ = new(big.Int).SetString("2203960485148121921418603742825762020974279258880205651966", 10)
@@ -336,7 +345,7 @@ func AltbnKang12(message []byte) (p1, p2 *big.Int) {
 	return
 }
 
-// AltbnHashToCurve Hashes a message to a point on Altbn128 using Keccak3 and try and increment
+// HashToG1 Hashes a message to a point on Altbn128 using Keccak3 and try and increment
 // This is for compatability with Ethereum hashing.
 // The return value is the altbn_128 library's internel representation for points.
 func (curve *altbn128) HashToG1(message []byte) Point1 {
