@@ -33,7 +33,7 @@ func KeyGen(curve CurveSystem) (*big.Int, Point2, error) {
 	return x, pubKey, nil
 }
 
-//LoadKey turns secret key into SigninKey and Point2
+//LoadPublicKey turns secret key into a public key of type Point2
 func LoadPublicKey(curve CurveSystem, sk *big.Int) Point2 {
 	pubKey := curve.GetG2().Mul(sk)
 	return pubKey
@@ -127,15 +127,30 @@ func VerifyAggregateSignature(curve CurveSystem, aggsig Point1, keys []Point2, m
 			return false
 		}
 	}
-	e1, _ := aggsig.Pair(curve.GetG2())
-	h := curve.HashToG1(msgs[0])
-	e2, _ := h.Pair(keys[0])
+	c := make(chan PointT)
+	c2 := make(chan PointT)
+	go concurrentPair(curve, aggsig, curve.GetG2(), c2)
+	for i := 0; i < len(msgs); i++ {
+		go concurrentMsgPair(curve, msgs[i], keys[i], c)
+	}
+	e1 := <-c2
+	e2 := <-c
 	for i := 1; i < len(msgs); i++ {
-		h = curve.HashToG1(msgs[i])
-		e3, _ := h.Pair(keys[i]) // Temporary variable to store result of pairing
-		e2, _ = e3.Add(e2)
+		e3 := <-c
+		e2, _ = e2.Add(e3)
 	}
 	return e1.Equals(e2)
+}
+
+func concurrentPair(curve CurveSystem, pt Point1, key Point2, c chan PointT) {
+	targetPoint, _ := pt.Pair(key)
+	c <- targetPoint
+}
+
+func concurrentMsgPair(curve CurveSystem, msg []byte, key Point2, c chan PointT) {
+	h := curve.HashToG1(msg)
+	targetPoint, _ := h.Pair(key)
+	c <- targetPoint
 }
 
 //Verify checks that a single message has been signed by a set of keys
@@ -147,10 +162,12 @@ func (m MultiSig) Verify(curve CurveSystem) bool {
 // VerifyMultiSignature checks that the aggregate signature correctly proves that a single message has been signed by a set of keys,
 // vulnerable against chosen key attack, if keys have not been authenticated
 func VerifyMultiSignature(curve CurveSystem, aggsig Point1, keys []Point2, msg []byte) bool {
-	e1, _ := aggsig.Pair(curve.GetG2())
 	vs := AggregateG2(keys)
-	h := curve.HashToG1(msg)
-	e2, _ := h.Pair(vs)
+	c := make(chan PointT)
+	go concurrentPair(curve, aggsig, curve.GetG2(), c)
+	go concurrentMsgPair(curve, msg, vs, c)
+	e1 := <-c
+	e2 := <-c
 	return e1.Equals(e2)
 }
 

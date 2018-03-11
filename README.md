@@ -25,7 +25,7 @@ The generator `g_2` is defined as: `(1155973203298638710799100402139228578392581
 The identity element for both groups (The point at infinity in affine space) is internally represented as `(0,0)`
 
 ## Benchmarks
-The following benchmarks are from a 3.80GHz i7-7700HQ CPU with 16GB ram. Note that all code is running on a single core.
+The following benchmarks are from a 3.80GHz i7-7700HQ CPU with 16GB ram. The aggregate verification which is utilizing parallelization for the pairing operations. The multisignature has parellilization for the two involved pairing operations.
 
 For reference, the pairing operation (the slowest operation involved) takes ~1.6 milliseconds.
 ```
@@ -43,17 +43,17 @@ ok  	github.com/ethereum/go-ethereum/crypto/bn256/cloudflare	4.725s
 
 ```
 $ go test github.com/jlandrews/bgls -v -bench .
-BenchmarkKeygen-8                  	    3000	    465450 ns/op
-BenchmarkAltBnHashToCurve-8        	   10000	    101616 ns/op
-BenchmarkSigning-8                 	    5000	    250310 ns/op
-BenchmarkVerification-8            	     500	   3269717 ns/op
-BenchmarkMultiVerification64-8     	     500	   3878868 ns/op
-BenchmarkMultiVerification128-8    	     300	   3989605 ns/op
-BenchmarkMultiVerification256-8    	     300	   4326581 ns/op
-BenchmarkMultiVerification512-8    	     300	   4865951 ns/op
-BenchmarkMultiVerification1024-8   	     200	   5961354 ns/op
-BenchmarkMultiVerification2048-8   	     200	   8321105 ns/op
-BenchmarkAggregateVerification-8   	    1000	   1711109 ns/op
+BenchmarkKeygen-8                  	    3000	    434484 ns/op
+BenchmarkAltBnHashToCurve-8        	   20000	     91428 ns/op
+BenchmarkSigning-8                 	   10000	    217915 ns/op
+BenchmarkVerification-8            	     500	   3034879 ns/op
+BenchmarkMultiVerification64-8     	    1000	   2386033 ns/op
+BenchmarkMultiVerification128-8    	     500	   2540242 ns/op
+BenchmarkMultiVerification256-8    	     500	   2799466 ns/op
+BenchmarkMultiVerification512-8    	     500	   3315630 ns/op
+BenchmarkMultiVerification1024-8   	     300	   4370168 ns/op
+BenchmarkMultiVerification2048-8   	     200	   6483694 ns/op
+BenchmarkAggregateVerification-8   	    5000	    360314 ns/op
 PASS
 ok  	github.com/jlandrews/bgls	27.739s
 ```
@@ -80,6 +80,7 @@ We previously used a direct implementation of [Indifferentiable Hashing to Barre
 - Integrations with [bgls-on-evm](https://github.com/jlandrews/bgls-on-evm).
 - Add tests to show that none of the functions mutate data.
 - More complete usage documentation.
+- Parallelize the aggregation operations, used in the multisignatures.
 
 ## References
 - Dan Boneh, Craig Gentry, Ben Lynn, and Hovav Shacham. [Aggregate and verifiably encrypted signatures from bilinear maps](https://www.iacr.org/archive/eurocrypt2003/26560416/26560416.pdf)
