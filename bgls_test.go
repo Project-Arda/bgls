@@ -165,11 +165,11 @@ func TestMultiSig(t *testing.T) {
 func TestMarshal(t *testing.T) {
 	curve := Altbn128
 	numTests := 32
-	required_scalars := []*big.Int{one, altbnG1Order}
+	requiredScalars := []*big.Int{one, altbnG1Order}
 	for i := 0; i < numTests; i++ {
 		scalar, _ := rand.Int(rand.Reader, curve.getG1Order())
-		if i < len(required_scalars) {
-			scalar = required_scalars[i]
+		if i < len(requiredScalars) {
+			scalar = requiredScalars[i]
 		}
 
 		mulg1 := curve.GetG1().Mul(scalar)

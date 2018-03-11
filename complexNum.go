@@ -85,8 +85,8 @@ func (result *complexNum) Exp(base *complexNum, power *big.Int, p *big.Int) *com
 	return result
 }
 
-func (num *complexNum) Equals(other *complexNum) bool {
-	if num.im.Cmp(other.im) != 0 || num.re.Cmp(other.re) != 0 {
+func (result *complexNum) Equals(other *complexNum) bool {
+	if result.im.Cmp(other.im) != 0 || result.re.Cmp(other.re) != 0 {
 		return false
 	}
 	return true
