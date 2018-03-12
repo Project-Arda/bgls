@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var curves = []CurveSystem{Altbn128}
+
 func TestAltbnHashToCurve(t *testing.T) {
 	curve := Altbn128
 	N := 10
@@ -77,138 +79,146 @@ func TestEthereumHash(t *testing.T) {
 }
 
 func TestSingleSigner(t *testing.T) {
-	curve := Altbn128
-	sk, vk, err := KeyGen(curve)
-	assert.Nil(t, err, "Key generation failed")
-	assert.True(t, CheckAuthentication(curve, vk, Authenticate(curve, sk)), "Key Authentication failed")
-	d := make([]byte, 64)
-	_, err = rand.Read(d)
-	assert.Nil(t, err, "test data generation failed")
-	sig := Sign(curve, sk, d)
-	assert.True(t, Verify(curve, vk, d, sig), "Point1 verification failed")
+	for _, curve := range curves {
+		sk, vk, err := KeyGen(curve)
+		assert.Nil(t, err, "Key generation failed")
+		assert.True(t, CheckAuthentication(curve, vk, Authenticate(curve, sk)), "Key Authentication failed")
+		d := make([]byte, 64)
+		_, err = rand.Read(d)
+		assert.Nil(t, err, "test data generation failed")
+		sig := Sign(curve, sk, d)
+		assert.True(t, Verify(curve, vk, d, sig), "Point1 verification failed")
 
-	sigTmp := sig.Copy()
-	sigTmp, _ = sigTmp.Add(curve.GetG1())
-	sig2 := sigTmp
-	assert.False(t, Verify(curve, vk, d, sig2), "Point1 verification succeeding when it shouldn't")
+		sigTmp := sig.Copy()
+		sigTmp, _ = sigTmp.Add(curve.GetG1())
+		sig2 := sigTmp
+		assert.False(t, Verify(curve, vk, d, sig2), "Point1 verification succeeding when it shouldn't")
 
-	// TODO Add tests to show that this doesn't succeed if d or vk is altered
+		// TODO Add tests to show that this doesn't succeed if d or vk is altered
+	}
 }
 
 func TestAggregation(t *testing.T) {
-	curve := Altbn128
-	N, Size := 6, 32
-	msgs := make([][]byte, N+1)
-	sigs := make([]Point1, N+1)
-	pubkeys := make([]Point2, N+1)
-	for i := 0; i < N; i++ {
-		msgs[i] = make([]byte, Size)
-		rand.Read(msgs[i])
+	for _, curve := range curves {
+		N, Size := 6, 32
+		msgs := make([][]byte, N+1)
+		sigs := make([]Point1, N+1)
+		pubkeys := make([]Point2, N+1)
+		for i := 0; i < N; i++ {
+			msgs[i] = make([]byte, Size)
+			rand.Read(msgs[i])
 
-		sk, vk, _ := KeyGen(curve)
-		sig := Sign(curve, sk, msgs[i])
-		pubkeys[i] = vk
-		sigs[i] = sig
+			sk, vk, _ := KeyGen(curve)
+			sig := Sign(curve, sk, msgs[i])
+			pubkeys[i] = vk
+			sigs[i] = sig
+		}
+		aggSig := AggregateG1(sigs[:N])
+		assert.True(t, VerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N], false),
+			"Aggregate Point1 verification failed")
+		assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys[:N-1], msgs[:N], false),
+			"Aggregate Point1 verification succeeding without enough pubkeys")
+		skf, vkf, _ := KeyGen(curve)
+		pubkeys[N] = vkf
+		sigs[N] = Sign(curve, skf, msgs[0])
+		msgs[N] = msgs[0]
+		aggSig = AggregateG1(sigs)
+		assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys, msgs, false),
+			"Aggregate Point1 succeeding with duplicate messages with allow duplicates being false")
+		assert.True(t, VerifyAggregateSignature(curve, aggSig, pubkeys, msgs, true),
+			"Aggregate Point1 failing with duplicate messages with allow duplicates")
+		assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N], false),
+			"Aggregate Point1 succeeding with invalid signature")
+		msgs[0] = msgs[1]
+		msgs[1] = msgs[N]
+		aggSig = AggregateG1(sigs[:N])
+		assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N], false),
+			"Aggregate Point1 succeeded with messages 0 and 1 switched")
+
+		// TODO Add tests to make sure there is no mutation
 	}
-	aggSig := AggregateG1(sigs[:N])
-	assert.True(t, VerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N], false),
-		"Aggregate Point1 verification failed")
-	assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys[:N-1], msgs[:N], false),
-		"Aggregate Point1 verification succeeding without enough pubkeys")
-	skf, vkf, _ := KeyGen(curve)
-	pubkeys[N] = vkf
-	sigs[N] = Sign(curve, skf, msgs[0])
-	msgs[N] = msgs[0]
-	aggSig = AggregateG1(sigs)
-	assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys, msgs, false),
-		"Aggregate Point1 succeeding with duplicate messages with allow duplicates being false")
-	assert.True(t, VerifyAggregateSignature(curve, aggSig, pubkeys, msgs, true),
-		"Aggregate Point1 failing with duplicate messages with allow duplicates")
-	assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N], false),
-		"Aggregate Point1 succeeding with invalid signature")
-	msgs[0] = msgs[1]
-	msgs[1] = msgs[N]
-	aggSig = AggregateG1(sigs[:N])
-	assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N], false),
-		"Aggregate Point1 succeeded with messages 0 and 1 switched")
-
-	// TODO Add tests to make sure there is no mutation
 }
 
 func TestMultiSig(t *testing.T) {
-	curve := Altbn128
-	Tests, Size, Signers := 5, 32, 10
-	for i := 0; i < Tests; i++ {
-		msg := make([]byte, Size)
-		rand.Read(msg)
-		signers := make([]Point2, Signers)
-		sigs := make([]Point1, Signers)
-		for j := 0; j < Signers; j++ {
-			sk, vk, _ := KeyGen(curve)
-			sigs[j] = Sign(curve, sk, msg)
-			signers[j] = vk
+	for _, curve := range curves {
+		Tests, Size, Signers := 5, 32, 10
+		for i := 0; i < Tests; i++ {
+			msg := make([]byte, Size)
+			rand.Read(msg)
+			signers := make([]Point2, Signers)
+			sigs := make([]Point1, Signers)
+			for j := 0; j < Signers; j++ {
+				sk, vk, _ := KeyGen(curve)
+				sigs[j] = Sign(curve, sk, msg)
+				signers[j] = vk
+			}
+			aggSig := AggregateG1(sigs)
+			assert.True(t, VerifyMultiSignature(curve, aggSig, signers, msg),
+				"Aggregate MultiSig verification failed")
+			msg2 := make([]byte, Size)
+			rand.Read(msg2)
+			assert.False(t, VerifyMultiSignature(curve, aggSig, signers, msg2),
+				"Aggregate MultiSig verification succeeded on incorrect msg")
+			_, vkf, _ := KeyGen(curve)
+			signers[0] = vkf
+			assert.False(t, VerifyMultiSignature(curve, aggSig, signers, msg),
+				"Aggregate MultiSig verification succeeded on incorrect signers")
 		}
-		aggSig := AggregateG1(sigs)
-		assert.True(t, VerifyMultiSignature(curve, aggSig, signers, msg),
-			"Aggregate MultiSig verification failed")
-		msg2 := make([]byte, Size)
-		rand.Read(msg2)
-		assert.False(t, VerifyMultiSignature(curve, aggSig, signers, msg2),
-			"Aggregate MultiSig verification succeeded on incorrect msg")
-		_, vkf, _ := KeyGen(curve)
-		signers[0] = vkf
-		assert.False(t, VerifyMultiSignature(curve, aggSig, signers, msg),
-			"Aggregate MultiSig verification succeeded on incorrect signers")
 	}
 }
 
 func TestMarshal(t *testing.T) {
-	curve := Altbn128
-	numTests := 32
-	requiredScalars := []*big.Int{one, altbnG1Order}
-	for i := 0; i < numTests; i++ {
-		scalar, _ := rand.Int(rand.Reader, curve.getG1Order())
-		if i < len(requiredScalars) {
-			scalar = requiredScalars[i]
-		}
+	for _, curve := range curves {
+		numTests := 32
+		requiredScalars := []*big.Int{one, altbnG1Order}
+		for i := 0; i < numTests; i++ {
+			scalar, _ := rand.Int(rand.Reader, curve.getG1Order())
+			if i < len(requiredScalars) {
+				scalar = requiredScalars[i]
+			}
 
-		mulg1 := curve.GetG1().Mul(scalar)
-		marshalled := mulg1.Marshal()
-		if recoveredG1, ok := curve.UnmarshalG1(marshalled); ok {
-			assert.True(t, recoveredG1.Equals(mulg1),
-				"Unmarshalling G1 is not consistent with Marshal G1")
-		} else {
-			t.Error("Unmarshalling G1 failed")
-		}
-		marshalled = marshalled[1:]
-		if _, ok := curve.UnmarshalG1(marshalled); ok {
-			t.Error("Unmarshalling G1 is succeeding when the byte array is of the wrong length")
-		}
+			mulg1 := curve.GetG1().Mul(scalar)
+			marshalled := mulg1.Marshal()
+			if recoveredG1, ok := curve.UnmarshalG1(marshalled); ok {
+				assert.True(t, recoveredG1.Equals(mulg1),
+					"Unmarshalling G1 is not consistent with Marshal G1")
+			} else {
+				t.Error("Unmarshalling G1 failed")
+			}
+			marshalled = marshalled[1:]
+			if _, ok := curve.UnmarshalG1(marshalled); ok {
+				t.Error("Unmarshalling G1 is succeeding when the byte array is of the wrong length")
+			}
 
-		mulg2 := curve.GetG2().Mul(scalar)
-		marshalled = mulg2.Marshal()
-		if recoveredG2, ok := curve.UnmarshalG2(marshalled); ok {
-			assert.True(t, recoveredG2.Equals(mulg2),
-				"Unmarshalling G2 is not consistent with Marshal G2")
-		} else {
-			t.Error("Unmarshalling G2 failed on scalar " + scalar.String())
-		}
-		marshalled = marshalled[1:]
-		if _, ok := curve.UnmarshalG2(marshalled); ok {
-			t.Error("Unmarshalling G2 is succeeding when the byte array is of the wrong length")
-		}
+			mulg2 := curve.GetG2().Mul(scalar)
+			marshalled = mulg2.Marshal()
+			if recoveredG2, ok := curve.UnmarshalG2(marshalled); ok {
+				assert.True(t, recoveredG2.Equals(mulg2),
+					"Unmarshalling G2 is not consistent with Marshal G2")
+			} else {
+				t.Error("Unmarshalling G2 failed on scalar " + scalar.String())
+			}
+			marshalled = marshalled[1:]
+			if _, ok := curve.UnmarshalG2(marshalled); ok {
+				t.Error("Unmarshalling G2 is succeeding when the byte array is of the wrong length")
+			}
 
-		mulgT := curve.GetGT().Mul(scalar)
-		marshalled = mulgT.Marshal()
-		if recoveredGT, ok := curve.UnmarshalGT(marshalled); ok {
-			assert.True(t, recoveredGT.Equals(mulgT),
-				"Unmarshalling GT is not consistent with Marshal GT")
-		} else {
-			t.Error("Unmarshalling GT failed")
-		}
-		marshalled = marshalled[1:]
-		if _, ok := curve.UnmarshalGT(marshalled); ok {
-			t.Error("Unmarshalling GT is succeeding when the byte array is of the wrong length")
+			mulgT, _ := mulg1.Pair(curve.GetG2())
+			marshalled = mulgT.Marshal()
+			// fmt.Println("Coordinate wise representation of g1 * " + scalar.String() + " paired with g2")
+			// for i := 0; i < 12; i++ { // Code to print coordinates
+			// 	fmt.Println(marshalled[i*32 : (i+1)*32])
+			// }
+			if recoveredGT, ok := curve.UnmarshalGT(marshalled); ok {
+				assert.True(t, recoveredGT.Equals(mulgT),
+					"Unmarshalling GT is not consistent with Marshal GT")
+			} else {
+				t.Error("Unmarshalling GT failed")
+			}
+			marshalled = marshalled[1:]
+			if _, ok := curve.UnmarshalGT(marshalled); ok {
+				t.Error("Unmarshalling GT is succeeding when the byte array is of the wrong length")
+			}
 		}
 	}
 }

@@ -5,7 +5,6 @@ package bgls
 
 import (
 	"math/big"
-	"strconv"
 
 	"github.com/mimoo/GoKangarooTwelve/K12"
 )
@@ -35,7 +34,7 @@ func hash64(message []byte, hashfunc func(message []byte) [64]byte, curve CurveS
 	py = new(big.Int)
 	q := curve.getG1Q()
 	for {
-		h := hashfunc(append(message, strconv.Itoa(c)...))
+		h := hashfunc(append(message, byte(c)))
 		px.SetBytes(h[:48])
 		px.Mod(px, q)
 		ySqr := curve.g1XToYSquared(px)
