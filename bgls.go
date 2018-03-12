@@ -94,20 +94,90 @@ func VerifyCustHash(curve CurveSystem, pubKey Point2, m []byte, sig Point1, hash
 
 // AggregateG1 takes the sum of points on G1. This is used to convert a set of signatures into a single signature
 func AggregateG1(sigs []Point1) Point1 {
-	aggG1 := sigs[0].Copy()
-	for _, s := range sigs[1:] {
-		aggG1, _ = aggG1.Add(s)
+	c := make(chan Point1)
+	if len(sigs) == 2 {
+		aggG1, _ := sigs[0].Add(sigs[1])
+		return aggG1
 	}
-	return aggG1
+	aggSigs := make([]Point1, (len(sigs)/2)+(len(sigs)%2))
+	counter := 0
+	for i := 0; i < len(sigs); i += 2 { // No parallelization needed
+		go concurrentAggregateG1(i, i+2, sigs, c)
+		counter++
+	}
+	for i := 0; i < counter; i++ {
+		aggSigs[i] = <-c
+	}
+
+	for {
+		nxtAggSigs := make([]Point1, (len(aggSigs)/2)+(len(aggSigs)%2))
+		counter = 0
+		if len(aggSigs) == 1 {
+			break
+		}
+		for i := 0; i < len(aggSigs); i += 2 {
+			go concurrentAggregateG1(i, i+2, aggSigs, c)
+			counter++
+		}
+		for i := 0; i < counter; i++ {
+			nxtAggSigs[i] = <-c
+		}
+		aggSigs = nxtAggSigs
+	}
+	return aggSigs[0]
 }
 
-// AggregateG2 takes the sum of points on G1. This is used to sum a set of public keys for the multisignature
-func AggregateG2(keys []Point2) Point2 {
-	aggG2 := keys[0].Copy()
-	for _, s := range keys[1:] {
-		aggG2, _ = aggG2.Add(s)
+func concurrentAggregateG1(start int, end int, sigs []Point1, c chan Point1) {
+	if end > len(sigs) {
+		c <- sigs[start]
+		return
 	}
-	return aggG2
+	summed, _ := sigs[start].Add(sigs[end-1])
+	c <- summed
+}
+
+// AggregateG2 takes the sum of points on G2. This is used to sum a set of public keys for the multisignature
+func AggregateG2(keys []Point2) Point2 {
+	c := make(chan Point2)
+	if len(keys) == 2 { // No parallelization needed
+		aggG2, _ := keys[0].Add(keys[1])
+		return aggG2
+	}
+	aggKeys := make([]Point2, (len(keys)/2)+(len(keys)%2))
+	counter := 0
+	for i := 0; i < len(keys); i += 2 {
+		go concurrentAggregateG2(i, i+2, keys, c)
+		counter++
+	}
+	for i := 0; i < counter; i++ {
+		aggKeys[i] = <-c
+	}
+
+	for {
+		nxtAggKeys := make([]Point2, (len(aggKeys)/2)+(len(aggKeys)%2))
+		counter = 0
+		if len(aggKeys) == 1 {
+			break
+		}
+		for i := 0; i < len(aggKeys); i += 2 {
+			go concurrentAggregateG2(i, i+2, aggKeys, c)
+			counter++
+		}
+		for i := 0; i < counter; i++ {
+			nxtAggKeys[i] = <-c
+		}
+		aggKeys = nxtAggKeys
+	}
+	return aggKeys[0]
+}
+
+func concurrentAggregateG2(start int, end int, keys []Point2, c chan Point2) {
+	if end > len(keys) {
+		c <- keys[start]
+		return
+	}
+	summed, _ := keys[start].Add(keys[end-1])
+	c <- summed
 }
 
 // Verify checks that all messages were signed by associated keys
