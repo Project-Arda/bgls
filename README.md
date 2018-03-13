@@ -1,4 +1,7 @@
 # BGLS
+Master: [![Build Status](https://travis-ci.org/Project-Arda/bgls.svg?branch=master)](https://travis-ci.org/Project-Arda/bgls)
+Develop: [![Build Status](https://travis-ci.org/Project-Arda/bgls.svg?branch=develop)](https://travis-ci.org/Project-Arda/bgls)
+
 Aggregate and Multi Signatures based on BGLS over Alt bn128
 
 This library provides no security against side channel attacks. We provide no security guarantees of this implementation.
@@ -80,7 +83,7 @@ We previously used a direct implementation of [Indifferentiable Hashing to Barre
 - Integrations with [bgls-on-evm](https://github.com/jlandrews/bgls-on-evm).
 - Add tests to show that none of the functions mutate data.
 - More complete usage documentation.
-- Add buffering for the channels used in parallelization. 
+- Add buffering for the channels used in parallelization.
 
 ## References
 - Dan Boneh, Craig Gentry, Ben Lynn, and Hovav Shacham. [Aggregate and verifiably encrypted signatures from bilinear maps](https://www.iacr.org/archive/eurocrypt2003/26560416/26560416.pdf)
