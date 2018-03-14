@@ -29,13 +29,13 @@ func kang12_64(messageDat []byte) [64]byte {
 
 // 64 byte hash
 func tryAndIncrement64(message []byte, hashfunc func(message []byte) [64]byte, curve CurveSystem) (px, py *big.Int) {
-	c := 0
+	counter := []byte{byte(0)}
 	px = new(big.Int)
 	py = new(big.Int)
 	q := curve.getG1Q()
 	for {
-		h := hashfunc(append(message, byte(c)))
-		c++
+		h := hashfunc(append(counter, message...))
+		counter[0]++
 		px.SetBytes(h[:48])
 		px.Mod(px, q)
 		ySqr := curve.g1XToYSquared(px)
@@ -71,13 +71,13 @@ func sortBigInts(b1 *big.Int, b2 *big.Int) (*big.Int, *big.Int) {
 // Try and Increment hashing that is meant to comply with the standards we are using in the solidity contract.
 // This is not recommended for use anywhere else.
 func tryAndIncrementEvm(message []byte, hashfunc func(message []byte) [32]byte, curve CurveSystem) (px, py *big.Int) {
-	c := 0
+	counter := []byte{byte(0)}
 	px = new(big.Int)
 	py = new(big.Int)
 	q := curve.getG1Q()
 	for {
-		h := hashfunc(append(message, byte(c)))
-		c++
+		h := hashfunc(append(counter, message...))
+		counter[0]++
 		px.SetBytes(h[:32])
 		px.Mod(px, q)
 		ySqr := curve.g1XToYSquared(px)
@@ -85,7 +85,8 @@ func tryAndIncrementEvm(message []byte, hashfunc func(message []byte) [32]byte, 
 		rootSqr := new(big.Int).Exp(root, two, q)
 		if rootSqr.Cmp(ySqr) == 0 {
 			py = root
-			signY := hashfunc(append(message, byte(255)))[31] % 2
+			counter[0] = byte(255)
+			signY := hashfunc(append(counter, message...))[31] % 2
 			if signY == 1 {
 				py.Sub(q, py)
 			}
