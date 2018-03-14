@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var curves = []CurveSystem{Altbn128}
+var curves = []CurveSystem{Altbn128, Bls12}
 
 func TestAltbnHashToCurve(t *testing.T) {
 	curve := Altbn128
