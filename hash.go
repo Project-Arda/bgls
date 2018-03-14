@@ -4,6 +4,7 @@
 package bgls
 
 import (
+	"crypto/rand"
 	"math/big"
 
 	"github.com/mimoo/GoKangarooTwelve/K12"
@@ -14,18 +15,6 @@ var one = big.NewInt(1)
 var two = big.NewInt(2)
 var three = big.NewInt(3)
 var four = big.NewInt(4)
-
-// 64 byte kangaroo twelve hash
-func kang12_64(messageDat []byte) [64]byte {
-	inputByte := make([]byte, 1)
-	hashFunc := K12.NewK12(inputByte)
-	hashFunc.Write(messageDat)
-	out := make([]byte, 64)
-	hashFunc.Read(out)
-	x := [64]byte{}
-	copy(x[:], out[:64])
-	return x
-}
 
 // 64 byte hash
 func tryAndIncrement64(message []byte, hashfunc func(message []byte) [64]byte, curve CurveSystem) (px, py *big.Int) {
@@ -61,13 +50,6 @@ func tryAndIncrement64(message []byte, hashfunc func(message []byte) [64]byte, c
 	return
 }
 
-func sortBigInts(b1 *big.Int, b2 *big.Int) (*big.Int, *big.Int) {
-	if b1.Cmp(b2) > 0 {
-		return b2, b1
-	}
-	return b1, b2
-}
-
 // Try and Increment hashing that is meant to comply with the standards we are using in the solidity contract.
 // This is not recommended for use anywhere else.
 func tryAndIncrementEvm(message []byte, hashfunc func(message []byte) [32]byte, curve CurveSystem) (px, py *big.Int) {
@@ -94,6 +76,67 @@ func tryAndIncrementEvm(message []byte, hashfunc func(message []byte) [32]byte, 
 		}
 	}
 	return
+}
+
+func sortBigInts(b1 *big.Int, b2 *big.Int) (*big.Int, *big.Int) {
+	if b1.Cmp(b2) > 0 {
+		return b2, b1
+	}
+	return b1, b2
+}
+
+// Shallue - van de Woestijne encoding
+// from "Indifferentiable Hashing to Barreto–Naehrig Curves"
+func sw(curve CurveSystem, t *big.Int, maskQuadRes bool) (Point1, bool) {
+	var x [3]*big.Int
+
+	//w = sqrt(-3)*t / (1 + b + t^2)
+	w := new(big.Int)
+	q := curve.getG1Q()
+	b := curve.getG1B()
+	rootNeg3, neg1SubRootNeg3 := curve.getFTHashParams()
+	w.Exp(t, two, q)
+	w.Add(w.Add(w, one), b)
+	w.ModInverse(w, q)
+	w.Mul(w, t)
+	w.Mod(w, q)
+	w.Mul(w, rootNeg3)
+	w.Mod(w, q)
+
+	//x[0] = (-1 + sqrt(-3))/2 - t*w
+	x[0] = new(big.Int)
+	x[0].Mul(t, w)
+	x[0].Mod(x[0], q)
+	x[0].Neg(x[0])
+	x[0].Mod(x[0], q)
+	x[0].Add(x[0], neg1SubRootNeg3)
+	x[0].Mod(x[0], q)
+
+	//x[1] = -1 - x[1]
+	x[1] = new(big.Int)
+	x[1].Neg(x[0])
+	x[1].Sub(x[1], one)
+	x[1].Mod(x[1], q)
+
+	//x[2] = 1 + 1/w^2
+	x[2] = new(big.Int)
+	x[2].Exp(w, two, q)
+	x[2].ModInverse(x[2], q)
+	x[2].Add(x[2], one)
+	x[2].Mod(x[2], q)
+
+	//i = first x[i] such that (x^3 + b) is square
+	i := (((chkPoint(x[0], q, b, maskQuadRes) - 1) * chkPoint(x[1], q, b, maskQuadRes)) + 3) % 3
+
+	//y = quadRes(t) * sqrt(x^3 + b)
+	yr := new(big.Int)
+	yr.Exp(x[i], three, q)
+	yr.Add(yr, b)
+	yr = calcQuadRes(yr, q)
+	yr.Mul(yr, big.NewInt(maskedQuadRes(t, q, maskQuadRes)))
+	yr.Mod(yr, q)
+
+	return curve.MakeG1Point(x[i], yr)
 }
 
 // Currently implementing first method from
@@ -147,6 +190,35 @@ func calcComplexQuadRes(ySqr *complexNum, q *big.Int) *complexNum {
 	return result
 }
 
+//generates a random member of Fq such that it is a square
+func randSquare(q *big.Int) *big.Int {
+	var r, _ = rand.Int(rand.Reader, q)
+	return r.Exp(r, two, q)
+}
+
+//masks x with a random square in Fq, to limit timing leakage
+func maskedQuadRes(k *big.Int, q *big.Int, mask bool) int64 {
+	r := k
+	if mask {
+		r = randSquare(q)
+		r.Mul(r, k)
+		r.Mod(r, q)
+	}
+	res := isQuadRes(r, q)
+	if res {
+		return 1
+	}
+	return -1
+}
+
+//checks that (x^3 + b) is a square in Fq
+func chkPoint(x *big.Int, q *big.Int, b *big.Int, mask bool) int64 {
+	x3pb := new(big.Int).Exp(x, three, q)
+	x3pb.Add(x3pb, b)
+	x3pb.Mod(x3pb, q)
+	return maskedQuadRes(x3pb, q, mask)
+}
+
 // Implement Eulers Criterion
 func isQuadRes(a *big.Int, q *big.Int) bool {
 	if a.Cmp(zero) == 0 {
@@ -159,4 +231,16 @@ func isQuadRes(a *big.Int, q *big.Int) bool {
 		return true
 	}
 	return false
+}
+
+// 64 byte kangaroo twelve hash
+func kang12_64(messageDat []byte) [64]byte {
+	inputByte := make([]byte, 1)
+	hashFunc := K12.NewK12(inputByte)
+	hashFunc.Write(messageDat)
+	out := make([]byte, 64)
+	hashFunc.Read(out)
+	x := [64]byte{}
+	copy(x[:], out[:64])
+	return x
 }
