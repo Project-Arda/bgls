@@ -30,6 +30,8 @@ type CurveSystem interface {
 	getG1Q() *big.Int
 	// getGTQ() *big.Int
 
+	getG1Cofactor() *big.Int
+
 	getG1A() *big.Int
 	getG1B() *big.Int
 	getG1Order() *big.Int
