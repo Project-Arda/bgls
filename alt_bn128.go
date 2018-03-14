@@ -363,6 +363,10 @@ func (curve *altbn128) getG1Cofactor() *big.Int {
 	return one
 }
 
+func (curve *altbn128) getFTHashParams() (*big.Int, *big.Int) {
+	return altbnSqrtn3, altbnZ
+}
+
 //curve specific constants
 var altbnG1B = big.NewInt(3)
 var altbnG1Q, _ = new(big.Int).SetString("21888242871839275222246405745257275088696311157297823662689037894645226208583", 10)
