@@ -359,6 +359,10 @@ func (curve *altbn128) GetGT() PointT {
 	return altbnGT
 }
 
+func (curve *altbn128) getG1Cofactor() *big.Int {
+	return one
+}
+
 //curve specific constants
 var altbnG1B = big.NewInt(3)
 var altbnG1Q, _ = new(big.Int).SetString("21888242871839275222246405745257275088696311157297823662689037894645226208583", 10)
@@ -384,7 +388,7 @@ var altbnG1Order, _ = new(big.Int).SetString("2188824287183927522224640574525727
 // AltbnSha3 Hashes a message to a point on Altbn128 using SHA3 and try and increment
 // The return value is the x,y affine coordinate pair.
 func AltbnSha3(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash64(message, sha3.Sum512, Altbn128)
+	p1, p2 = tryAndIncrement64(message, sha3.Sum512, Altbn128)
 	return
 }
 
@@ -392,21 +396,21 @@ func AltbnSha3(message []byte) (p1, p2 *big.Int) {
 // Keccak3 is only for compatability with Ethereum hashing.
 // The return value is the x,y affine coordinate pair.
 func AltbnKeccak3(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash32(message, EthereumSum256, Altbn128)
+	p1, p2 = tryAndIncrementEvm(message, EthereumSum256, Altbn128)
 	return
 }
 
 // AltbnBlake2b Hashes a message to a point on Altbn128 using Blake2b and try and increment
 // The return value is the x,y affine coordinate pair.
 func AltbnBlake2b(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash64(message, blake2b.Sum512, Altbn128)
+	p1, p2 = tryAndIncrement64(message, blake2b.Sum512, Altbn128)
 	return
 }
 
 // AltbnKang12 Hashes a message to a point on Altbn128 using Blake2b and try and increment
 // The return value is the x,y affine coordinate pair.
 func AltbnKang12(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash64(message, kang12_64, Altbn128)
+	p1, p2 = tryAndIncrement64(message, kang12_64, Altbn128)
 	return
 }
 

@@ -28,55 +28,77 @@ func kang12_64(messageDat []byte) [64]byte {
 }
 
 // 64 byte hash
-func hash64(message []byte, hashfunc func(message []byte) [64]byte, curve CurveSystem) (px, py *big.Int) {
+func tryAndIncrement64(message []byte, hashfunc func(message []byte) [64]byte, curve CurveSystem) (px, py *big.Int) {
 	c := 0
 	px = new(big.Int)
 	py = new(big.Int)
 	q := curve.getG1Q()
 	for {
 		h := hashfunc(append(message, byte(c)))
+		c++
 		px.SetBytes(h[:48])
 		px.Mod(px, q)
 		ySqr := curve.g1XToYSquared(px)
-		if isQuadRes(ySqr, q) == true {
-			py = calcQuadRes(ySqr, q)
-			signY := int(h[48]) % 2
-			if signY == 1 {
-				py.Sub(q, py)
+		root := calcQuadRes(ySqr, q)
+		rootSqr := new(big.Int).Exp(root, two, q)
+		if rootSqr.Cmp(ySqr) == 0 {
+			other_root := py.Sub(q, py)
+			// Set root to the canonical square root.
+			root, other_root = sortBigInts(root, other_root)
+			// Use the canonical root for py, unless the cofactor is one, in which case
+			// use an extra bit to determine parity.
+			py = root
+			if curve.getG1Cofactor().Cmp(one) == 0 {
+				signY := int(h[48]) % 2
+				if signY == 1 {
+					py = other_root
+					break
+				}
 			}
 			break
 		}
-		c++
 	}
 	return
 }
 
-// 32 byte hash which complies with standards we are using in the solidity contract.
-func hash32(message []byte, hashfunc func(message []byte) [32]byte, curve CurveSystem) (px, py *big.Int) {
+func sortBigInts(b1 *big.Int, b2 *big.Int) (*big.Int, *big.Int) {
+	if b1.Cmp(b2) > 0 {
+		return b2, b1
+	}
+	return b1, b2
+}
+
+// Try and Increment hashing that is meant to comply with the standards we are using in the solidity contract.
+// This is not recommended for use anywhere else.
+func tryAndIncrementEvm(message []byte, hashfunc func(message []byte) [32]byte, curve CurveSystem) (px, py *big.Int) {
 	c := 0
 	px = new(big.Int)
 	py = new(big.Int)
 	q := curve.getG1Q()
 	for {
 		h := hashfunc(append(message, byte(c)))
+		c++
 		px.SetBytes(h[:32])
 		px.Mod(px, q)
 		ySqr := curve.g1XToYSquared(px)
-		if isQuadRes(ySqr, q) == true {
-			py = calcQuadRes(ySqr, q)
+		root := calcQuadRes(ySqr, q)
+		rootSqr := new(big.Int).Exp(root, two, q)
+		if rootSqr.Cmp(ySqr) == 0 {
+			py = root
 			signY := hashfunc(append(message, byte(255)))[31] % 2
 			if signY == 1 {
 				py.Sub(q, py)
 			}
 			break
 		}
-		c++
 	}
 	return
 }
 
 // Currently implementing first method from
 // http://mathworld.wolfram.com/QuadraticResidue.html
+// Experimentally, this seems to always return the canonical square root,
+// however I haven't seen a proof of this.
 func calcQuadRes(ySqr *big.Int, q *big.Int) *big.Int {
 	resMod4 := new(big.Int).Mod(q, four)
 	if resMod4.Cmp(three) == 0 {
