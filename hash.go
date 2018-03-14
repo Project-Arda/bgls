@@ -87,7 +87,10 @@ func sortBigInts(b1 *big.Int, b2 *big.Int) (*big.Int, *big.Int) {
 
 // Shallue - van de Woestijne encoding
 // from "Indifferentiable Hashing to Barreto–Naehrig Curves"
-func sw(curve CurveSystem, t *big.Int, maskQuadRes bool) (Point1, bool) {
+func sw(curve CurveSystem, t *big.Int, blindQuadChar bool) (Point1, bool) {
+	if t == zero {
+		return curve.MakeG1Point(zero, zero)
+	} // TODO Add other case where t is undefined
 	var x [3]*big.Int
 
 	//w = sqrt(-3)*t / (1 + b + t^2)
@@ -96,7 +99,8 @@ func sw(curve CurveSystem, t *big.Int, maskQuadRes bool) (Point1, bool) {
 	b := curve.getG1B()
 	rootNeg3, neg1SubRootNeg3 := curve.getFTHashParams()
 	w.Exp(t, two, q)
-	w.Add(w.Add(w, one), b)
+	w.Add(w, one)
+	w.Add(w, b)
 	w.ModInverse(w, q)
 	w.Mul(w, t)
 	w.Mod(w, q)
@@ -126,14 +130,14 @@ func sw(curve CurveSystem, t *big.Int, maskQuadRes bool) (Point1, bool) {
 	x[2].Mod(x[2], q)
 
 	//i = first x[i] such that (x^3 + b) is square
-	i := (((chkPoint(x[0], q, b, maskQuadRes) - 1) * chkPoint(x[1], q, b, maskQuadRes)) + 3) % 3
+	i := (((chkPoint(x[0], q, b, blindQuadChar) - 1) * chkPoint(x[1], q, b, blindQuadChar)) + 3) % 3
 
 	//y = quadRes(t) * sqrt(x^3 + b)
 	yr := new(big.Int)
 	yr.Exp(x[i], three, q)
 	yr.Add(yr, b)
 	yr = calcQuadRes(yr, q)
-	yr.Mul(yr, big.NewInt(maskedQuadRes(t, q, maskQuadRes)))
+	yr.Mul(yr, big.NewInt(quadraticCharacter(t, q, blindQuadChar)))
 	yr.Mod(yr, q)
 
 	return curve.MakeG1Point(x[i], yr)
@@ -196,10 +200,12 @@ func randSquare(q *big.Int) *big.Int {
 	return r.Exp(r, two, q)
 }
 
-//masks x with a random square in Fq, to limit timing leakage
-func maskedQuadRes(k *big.Int, q *big.Int, mask bool) int64 {
+// If blind is true, this blinds k with a random square in Fq,
+// and then returns square root. This can be done to limit timing leakage.
+// This returns the quadratic character of k.
+func quadraticCharacter(k *big.Int, q *big.Int, blind bool) int64 {
 	r := k
-	if mask {
+	if blind {
 		r = randSquare(q)
 		r.Mul(r, k)
 		r.Mod(r, q)
@@ -216,7 +222,7 @@ func chkPoint(x *big.Int, q *big.Int, b *big.Int, mask bool) int64 {
 	x3pb := new(big.Int).Exp(x, three, q)
 	x3pb.Add(x3pb, b)
 	x3pb.Mod(x3pb, q)
-	return maskedQuadRes(x3pb, q, mask)
+	return quadraticCharacter(x3pb, q, mask)
 }
 
 // Implement Eulers Criterion

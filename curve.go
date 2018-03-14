@@ -34,7 +34,7 @@ type CurveSystem interface {
 
 	getG1A() *big.Int
 	getG1B() *big.Int
-	// Fouque-Tibouchi hash parameters
+	// Fouque-Tibouchi hash parameters, sqrt(-3), (-1 + sqrt(-3))/2 computed in F_q
 	getFTHashParams() (*big.Int, *big.Int)
 	getG1Order() *big.Int
 	g1XToYSquared(*big.Int) *big.Int
