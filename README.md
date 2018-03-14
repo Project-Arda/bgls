@@ -28,7 +28,7 @@ The generator `g_2` is defined as: `(1155973203298638710799100402139228578392581
 The identity element for both groups (The point at infinity in affine space) is internally represented as `(0,0)`
 
 ## Benchmarks
-The following benchmarks are from a 3.80GHz i7-7700HQ CPU with 16GB ram. The aggregate verification which is utilizing parallelization for the pairing operations. The multisignature has parellilization for the two involved pairing operations, and parallelization for the pairing checks at the end.
+The following benchmarks are from a 3.80GHz i7-7700HQ CPU with 16GB ram. The aggregate verification is utilizing parallelization for the pairing operations. The multisignature has parellilization for the two involved pairing operations, and parallelization for the pairing checks at the end.
 
 For reference, the pairing operation (the slowest operation involved) takes ~1.6 milliseconds.
 ```
@@ -40,9 +40,9 @@ ok  	github.com/ethereum/go-ethereum/crypto/bn256/cloudflare	4.725s
 ```
 
 - `Signing` ~.22 milliseconds
-- `Signature verification` ~3.4 milliseconds, using two pairings.
-- `Multi Signature verification` ~3.7 milliseconds + ~2 microseconds per signer, two pairings + n point additions
-- `Aggregate Signature verification` ~.2 milliseconds per signer/message pair, with n+1 pairings.
+- `Signature verification` ~3.1 milliseconds, using two pairings.
+- `Multi Signature verification` ~2 milliseconds + ~1.1 microseconds per signer, two pairings + n point additions
+- `Aggregate Signature verification` ~.36 milliseconds per signer/message pair, with n+1 pairings run in parallel. (4.45x speedup with 8 cores)
 
 ```
 $ go test github.com/Project-Arda/bgls/  -v -bench .
