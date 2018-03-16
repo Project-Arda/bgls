@@ -63,7 +63,7 @@ func (g1Point *bls12Point1) Mul(scalar *big.Int) Point1 {
 func (g1Point *bls12Point1) ToAffineCoords() (x, y *big.Int) {
 	g1Point.point.Normalize()
 	blsx, blsy, _ := g1Point.point.GetXYZ()
-	return blsx.ToInt(), blsy.ToInt()
+	return blsx.ToInt()[0], blsy.ToInt()[0]
 }
 
 func (g1Point *bls12Point1) Pair(g2Point Point2) (PointT, bool) {
@@ -153,7 +153,8 @@ func (pt bls12PointT) Mul(scalar *big.Int) PointT {
 }
 
 func (curve *bls12Curve) MakeG1Point(x, y *big.Int) (Point1, bool) {
-	pt := new(bls12.G1).SetXY(new(bls12.Fq).FromInt(x), new(bls12.Fq).FromInt(y))
+	pt := new(bls12.G1)
+	pt.SetXY(bls12.FqFromInt(x), bls12.FqFromInt(y))
 	// TODO need to add method to check if the point is on the curve whenever this is called.
 	// In the other library, this was already checked
 	return &bls12Point1{pt}, true
@@ -187,11 +188,11 @@ func (curve *bls12Curve) UnmarshalGT(data []byte) (PointT, bool) {
 }
 
 func (curve *bls12Curve) GetG1() Point1 {
-	return &bls12Point1{new(bls12.G1).SetOne()}
+	return &bls12Point1{bls12.G1One()}
 }
 
 func (curve *bls12Curve) GetG2() Point2 {
-	return &bls12Point2{new(bls12.G2).SetOne()}
+	return &bls12Point2{bls12.G2One()}
 }
 
 func (curve *bls12Curve) GetGT() PointT {
@@ -215,9 +216,8 @@ func (curve *bls12Curve) getG1Cofactor() *big.Int {
 }
 
 func (curve *bls12Curve) g1XToYSquared(x *big.Int) *big.Int {
-	pt := new(bls12.G1).SetXY(new(bls12.Fq).FromInt(x), new(bls12.Fq).FromInt(zero))
-	y := pt.Y2FromX()
-	return (&y).ToInt()
+	y := bls12.FqFromInt(x).Y2FromX(nil)
+	return y.ToInt()[0]
 }
 
 func (curve *bls12Curve) getG1Order() *big.Int {
