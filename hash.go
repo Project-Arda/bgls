@@ -85,18 +85,26 @@ func sortBigInts(b1 *big.Int, b2 *big.Int) (*big.Int, *big.Int) {
 	return b1, b2
 }
 
+func fouqueTibouchiG1(curve CurveSystem, t *big.Int, blind bool) (Point1, bool) {
+	pt, ok := sw(curve, t, blind)
+	if !ok {
+		return nil, false
+	}
+	pt = pt.Mul(curve.getG1Cofactor())
+	return pt, true
+}
+
 // Shallue - van de Woestijne encoding
 // from "Indifferentiable Hashing to Barreto–Naehrig Curves"
-func sw(curve CurveSystem, t *big.Int, blindQuadChar bool) (Point1, bool) {
-	if t == zero {
-		return curve.MakeG1Point(zero, zero)
-	} // TODO Add other case where t is undefined
+// TODO Don't calculate unneccessary x values in unblinded case.
+func sw(curve CurveSystem, t *big.Int, blind bool) (Point1, bool) {
 	var x [3]*big.Int
 
 	//w = sqrt(-3)*t / (1 + b + t^2)
 	w := new(big.Int)
-	q := curve.getG1Q()
 	b := curve.getG1B()
+	q := curve.getG1Q()
+	qDiv2 := curve.getG1QDivTwo()
 	rootNeg3, neg1SubRootNeg3 := curve.getFTHashParams()
 	w.Exp(t, two, q)
 	w.Add(w, one)
@@ -111,8 +119,7 @@ func sw(curve CurveSystem, t *big.Int, blindQuadChar bool) (Point1, bool) {
 	x[0] = new(big.Int)
 	x[0].Mul(t, w)
 	x[0].Mod(x[0], q)
-	x[0].Neg(x[0])
-	x[0].Mod(x[0], q)
+	x[0].Sub(q, x[0])
 	x[0].Add(x[0], neg1SubRootNeg3)
 	x[0].Mod(x[0], q)
 
@@ -130,17 +137,30 @@ func sw(curve CurveSystem, t *big.Int, blindQuadChar bool) (Point1, bool) {
 	x[2].Mod(x[2], q)
 
 	//i = first x[i] such that (x^3 + b) is square
-	i := (((chkPoint(x[0], q, b, blindQuadChar) - 1) * chkPoint(x[1], q, b, blindQuadChar)) + 3) % 3
+	i := int64(2)
+	if blind {
+		i = (((chkPoint(x[0], curve, q, blind) - 1) * chkPoint(x[1], curve, q, blind)) + 3) % 3
+	} else { // If blinding isn't needed, utilize conditional branches.
+		if chkPoint(x[0], curve, q, blind) == 1 {
+			i = 0
+		} else if chkPoint(x[1], curve, q, blind) == 1 {
+			i = 1
+		}
+	}
 
-	//y = quadRes(t) * sqrt(x^3 + b)
-	yr := new(big.Int)
-	yr.Exp(x[i], three, q)
-	yr.Add(yr, b)
-	yr = calcQuadRes(yr, q)
-	yr.Mul(yr, big.NewInt(quadraticCharacter(t, q, blindQuadChar)))
-	yr.Mod(yr, q)
+	// TODO Add blinded form of this
+	y := calcQuadRes(curve.g1XToYSquared(x[i]), q)
+	if parity(y, qDiv2) != parity(t, qDiv2) {
+		y.Sub(q, y)
+	}
+	return curve.MakeG1Point(x[i], y)
+}
 
-	return curve.MakeG1Point(x[i], yr)
+func parity(x *big.Int, qdiv2 *big.Int) int {
+	if x.Cmp(qdiv2) < 1 {
+		return 1
+	}
+	return 0
 }
 
 // Currently implementing first method from
@@ -218,11 +238,8 @@ func quadraticCharacter(k *big.Int, q *big.Int, blind bool) int64 {
 }
 
 //checks that (x^3 + b) is a square in Fq
-func chkPoint(x *big.Int, q *big.Int, b *big.Int, mask bool) int64 {
-	x3pb := new(big.Int).Exp(x, three, q)
-	x3pb.Add(x3pb, b)
-	x3pb.Mod(x3pb, q)
-	return quadraticCharacter(x3pb, q, mask)
+func chkPoint(x *big.Int, curve CurveSystem, q *big.Int, mask bool) int64 {
+	return quadraticCharacter(curve.g1XToYSquared(x), q, mask)
 }
 
 // Implement Eulers Criterion

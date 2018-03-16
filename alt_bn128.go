@@ -79,6 +79,10 @@ func (g1Point *altbn128Point1) Marshal() []byte {
 	return xBytes
 }
 
+func (g1Point *altbn128Point1) MarshalUncompressed() []byte {
+	return g1Point.point.Marshal()
+}
+
 func pad32Bytes(xBytes []byte) []byte {
 	if len(xBytes) < 32 {
 		offset := 32 - len(xBytes)
@@ -176,6 +180,10 @@ func (g2Point *altbn128Point2) Marshal() []byte {
 	return xBytes
 }
 
+func (g2Point *altbn128Point2) MarshalUncompressed() []byte {
+	return g2Point.point.Marshal()
+}
+
 func (g2Point *altbn128Point2) Mul(scalar *big.Int) Point2 {
 	prod := new(bn256.G2).ScalarMult(g2Point.point, scalar)
 	ret := &altbn128Point2{prod}
@@ -247,6 +255,7 @@ func (curve *altbn128) UnmarshalG1(data []byte) (Point1, bool) {
 		// Underlying library already checks that y is on the curve, thus isQuadRes isn't checked here
 		y = calcQuadRes(y, altbnG1Q)
 		doubleY := new(big.Int).Mul(y, two)
+		// TODO switch this to use the parity method
 		cmpRes := doubleY.Cmp(altbnG1Q)
 		if ySgn && cmpRes == -1 {
 			y.Sub(altbnG1Q, y)
@@ -329,6 +338,10 @@ func (curve *altbn128) getG1Q() *big.Int {
 	return altbnG1Q
 }
 
+func (curve *altbn128) getG1QDivTwo() *big.Int {
+	return altbnG1QDiv2
+}
+
 func (curve *altbn128) getG1Order() *big.Int {
 	return altbnG1Order
 }
@@ -370,6 +383,7 @@ func (curve *altbn128) getFTHashParams() (*big.Int, *big.Int) {
 //curve specific constants
 var altbnG1B = big.NewInt(3)
 var altbnG1Q, _ = new(big.Int).SetString("21888242871839275222246405745257275088696311157297823662689037894645226208583", 10)
+var altbnG1QDiv2 = new(big.Int).Div(altbnG1Q, two)
 
 var altbnG2BRe, _ = new(big.Int).SetString("19485874751759354771024239261021720505790618469301721065564631296452457478373", 10)
 var altbnG2BIm, _ = new(big.Int).SetString("266929791119991161246907387137283842545076965332900288569378510910307636690", 10)

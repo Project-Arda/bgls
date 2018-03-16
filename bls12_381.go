@@ -43,32 +43,36 @@ func (pt *bls12Point1) Copy() Point1 {
 	return &result
 }
 
-func (pt *bls12Point1) Equals(otherPoint1 Point1) bool {
-	if other, ok := (otherPoint1).(*bls12Point1); ok {
+func (pt *bls12Point1) Equals(otherPt Point1) bool {
+	if other, ok := (otherPt).(*bls12Point1); ok {
 		return pt.point.Equal(other.point)
 	}
 	return false
 }
 
-func (g1Point *bls12Point1) Marshal() []byte {
-	return g1Point.point.Marshal()
+func (pt *bls12Point1) Marshal() []byte {
+	return pt.point.Marshal()
 }
 
-func (g1Point *bls12Point1) Mul(scalar *big.Int) Point1 {
-	prod, _ := g1Point.Copy().(*bls12Point1)
+func (pt *bls12Point1) MarshalUncompressed() []byte {
+	return pt.point.MarshalUncompressed()
+}
+
+func (pt *bls12Point1) Mul(scalar *big.Int) Point1 {
+	prod, _ := pt.Copy().(*bls12Point1)
 	prod.point.ScalarMult(new(bls12.Scalar).FromInt(scalar))
 	return prod
 }
 
-func (g1Point *bls12Point1) ToAffineCoords() (x, y *big.Int) {
-	g1Point.point.Normalize()
-	blsx, blsy, _ := g1Point.point.GetXYZ()
+func (pt *bls12Point1) ToAffineCoords() (x, y *big.Int) {
+	pt.point.Normalize()
+	blsx, blsy, _ := pt.point.GetXYZ()
 	return blsx.ToInt()[0], blsy.ToInt()[0]
 }
 
-func (g1Point *bls12Point1) Pair(g2Point Point2) (PointT, bool) {
+func (pt *bls12Point1) Pair(g2Point Point2) (PointT, bool) {
 	if other, ok := (g2Point).(*bls12Point2); ok {
-		p3 := new(bls12.GT).Pair(g1Point.point, other.point)
+		p3 := new(bls12.GT).Pair(pt.point, other.point)
 		ret := bls12PointT{p3}
 		return ret, true
 	}
@@ -101,6 +105,10 @@ func (pt *bls12Point2) Marshal() []byte {
 	return pt.point.Marshal()
 }
 
+func (pt *bls12Point2) MarshalUncompressed() []byte {
+	return pt.point.MarshalUncompressed()
+}
+
 func (pt *bls12Point2) Mul(scalar *big.Int) Point2 {
 	prod, _ := pt.Copy().(*bls12Point2)
 	prod.point.ScalarMult(new(bls12.Scalar).FromInt(scalar))
@@ -108,11 +116,10 @@ func (pt *bls12Point2) Mul(scalar *big.Int) Point2 {
 }
 
 func (pt *bls12Point2) ToAffineCoords() (xx, xy, yx, yy *big.Int) {
-	// TODO These constants definitely need to be adjusted
-	// Currently this is just implemented to satisfy the curve interface.
-	Bytestream := pt.point.Marshal()
-	xxBytes, xyBytes := Bytestream[:32], Bytestream[32:64]
-	yxBytes, yyBytes := Bytestream[64:96], Bytestream[96:128]
+	// TODO Test this method
+	Bytestream := pt.point.MarshalUncompressed()
+	xxBytes, xyBytes := Bytestream[:48], Bytestream[48:96]
+	yxBytes, yyBytes := Bytestream[96:144], Bytestream[144:192]
 	xx = new(big.Int).SetBytes(xxBytes)
 	xy = new(big.Int).SetBytes(xyBytes)
 	yx = new(big.Int).SetBytes(yxBytes)
@@ -155,8 +162,9 @@ func (pt bls12PointT) Mul(scalar *big.Int) PointT {
 func (curve *bls12Curve) MakeG1Point(x, y *big.Int) (Point1, bool) {
 	pt := new(bls12.G1)
 	pt.SetXY(bls12.FqFromInt(x), bls12.FqFromInt(y))
-	// TODO need to add method to check if the point is on the curve whenever this is called.
-	// In the other library, this was already checked
+	if !pt.Check() {
+		return nil, false
+	}
 	return &bls12Point1{pt}, true
 }
 
@@ -196,7 +204,7 @@ func (curve *bls12Curve) GetG2() Point2 {
 }
 
 func (curve *bls12Curve) GetGT() PointT {
-	return GT
+	return bls12GT
 }
 
 func (curve *bls12Curve) getG1A() *big.Int {
@@ -209,6 +217,10 @@ func (curve *bls12Curve) getG1B() *big.Int {
 
 func (curve *bls12Curve) getG1Q() *big.Int {
 	return bls12Q
+}
+
+func (curve *bls12Curve) getG1QDivTwo() *big.Int {
+	return bls12QDiv2
 }
 
 func (curve *bls12Curve) getG1Cofactor() *big.Int {
@@ -229,6 +241,7 @@ func (curve *bls12Curve) getFTHashParams() (*big.Int, *big.Int) {
 }
 
 var bls12Q, _ = new(big.Int).SetString("0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab", 0)
+var bls12QDiv2 = new(big.Int).Div(bls12Q, two)
 var bls12X, _ = new(big.Int).SetString("-0xd201000000010000", 0)
 var bls12A, _ = new(big.Int).SetString("0", 10)
 var bls12B, _ = new(big.Int).SetString("4", 10)
@@ -238,53 +251,39 @@ var bls12Z, _ = new(big.Int).SetString("7934793907292155126213797016334214470608
 
 //precomputed sqrt(-3) in Fq
 var bls12SqrtNeg3, _ = new(big.Int).SetString("1586958781458431025242759403266842894121773480562120986020912974854563298150952611241517463240701", 10)
-var bls12Cofactor = makeBlsCofactor(bls12X)
+var bls12Cofactor, _ = new(big.Int).SetString("76329603384216526031706109802092473003", 10)
 var bls12Order, _ = new(big.Int).SetString("52435875175126190479447740508185965837690552500527637822603658699938581184513", 10)
-var GT, _ = Bls12.GetG1().Pair(Bls12.GetG2())
+var bls12GT, _ = Bls12.GetG1().Pair(Bls12.GetG2())
+var bls12G1Tag = []byte("G1_x")
 
-func makeBlsCofactor(x *big.Int) *big.Int {
-	x.Mod(x, bls12Q)
-	x.Sub(x, one)
-	x.Exp(x, x, two)
-	x.Div(x, three)
-	return x
-}
+var bls12FTRoot1, _ = new(big.Int).SetString("248294325734266649657405162895821171812231848760181225578082735178502750823719347628762635478508544819911854747095", 10)
+var bls12FTRoot2, _ = new(big.Int).SetString("3754115229487400743760384662840082984744650971178826659753975400945528899667118516813924993650507119217982417812692", 10)
 
-// This is currently a filler method so I can get the initial structure of bls12 committed.
-// This is going to be Foque Tibouchi hashing that is compatible with ebfull/pairings
+// Fouque Tibouchi hashing as specified in https://github.com/ebfull/pairing/pull/30
 func (curve *bls12Curve) HashToG1(message []byte) Point1 {
-	x, y := tryAndIncrement64(message, blake2b.Sum512, Bls12)
-	p, _ := curve.MakeG1Point(x, y)
-	return p
+	tBytes := bls12G1blake2b(message)
+	t := new(big.Int).SetBytes(tBytes[:])
+	t.Mod(t, curve.getG1Q())
+	// Explicitly handle undefined t
+	if t.Cmp(zero) == 0 {
+		pt, _ := curve.MakeG1Point(zero, zero)
+		return pt
+	} else if t.Cmp(bls12FTRoot1) == 0 {
+		return curve.GetG1()
+	} else if t.Cmp(bls12FTRoot2) == 0 {
+		pt := new(bls12.G1)
+		g1x, g1y := curve.GetG1().ToAffineCoords()
+		g1y.Sub(bls12Q, g1y)
+		pt.SetXY(bls12.FqFromInt(g1x), bls12.FqFromInt(g1y))
+		return &bls12Point1{pt}
+	}
+	pt, _ := fouqueTibouchiG1(Bls12, t, false)
+	return pt
 }
 
-// // Bls12Sha3 Hashes a message to a point on BLS12-381 using SHA3 and try and increment
-// // The return value is the x,y affine coordinate pair.
-// func Bls12Sha3(message []byte) (p1, p2 *big.Int) {
-// 	// TODO ADD COFACTOR MULTIPLICATION
-// 	p1, p2 = hash64(message, sha3.Sum512, bls12Q, bls12XToYSquared)
-// 	return
-// }
-//
-// // Bls12Blake2b Hashes a message to a point on BLS12-381 using Blake2b and try and increment
-// // The return value is the x,y affine coordinate pair.
-// func Bls12Blake2b(message []byte) (p1, p2 *big.Int) {
-// 	// TODO ADD COFACTOR MULTIPLICATION
-// 	p1, p2 = hash64(message, blake2b.Sum512, bls12Q, bls12XToYSquared)
-// 	return
-// }
-//
-// // Bls12Kang12 Hashes a message to a point on BLS12-381 using Kangaroo Twelve and try and increment
-// // The return value is the x,y affine coordinate pair.
-// func Bls12Kang12(message []byte) (p1, p2 *big.Int) {
-// 	// TODO ADD COFACTOR MULTIPLICATION
-// 	p1, p2 = hash64(message, kang12_64, bls12Q, bls12XToYSquared)
-// 	return
-// }
-
-// func bls12XToYSquared(x *big.Int) *big.Int {
-// 	result := new(big.Int)
-// 	result.Exp(x, three, bls12Q)
-// 	result.Add(result, bls12B)
-// 	return result
-// }
+// bls12G1blake2b returns Blake2b(message || CurveDescription || Tag)
+// This is done in correspondence to the current conversation going on at
+// https://github.com/ebfull/pairing/pull/30
+func bls12G1blake2b(message []byte) [64]byte {
+	return blake2b.Sum512(append(message, bls12G1Tag...))
+}
