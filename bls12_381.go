@@ -31,7 +31,7 @@ var Bls12 = &bls12Curve{}
 func (g1Point *bls12Point1) Add(otherPoint1 Point1) (Point1, bool) {
 	g1Copy, _ := g1Point.Copy().(*bls12Point1)
 	if other, ok := (otherPoint1).(*bls12Point1); ok {
-		sum := g1Copy.point.Add(other.point)
+		sum := g1Copy.point.Add(other.point).(*bls12.G1)
 		ret := &bls12Point1{sum}
 		return ret, true
 	}
@@ -39,7 +39,7 @@ func (g1Point *bls12Point1) Add(otherPoint1 Point1) (Point1, bool) {
 }
 
 func (pt *bls12Point1) Copy() Point1 {
-	result := bls12Point1{pt.point.Copy()}
+	result := bls12Point1{pt.point.Copy().(*bls12.G1)}
 	return &result
 }
 
@@ -78,7 +78,7 @@ func (g1Point *bls12Point1) Pair(g2Point Point2) (PointT, bool) {
 func (pt *bls12Point2) Add(otherPt Point2) (Point2, bool) {
 	copy, _ := pt.Copy().(*bls12Point2)
 	if other, ok := (otherPt).(*bls12Point2); ok {
-		sum := copy.point.Add(other.point)
+		sum := copy.point.Add(other.point).(*bls12.G2)
 		ret := &bls12Point2{sum}
 		return ret, true
 	}
@@ -86,7 +86,7 @@ func (pt *bls12Point2) Add(otherPt Point2) (Point2, bool) {
 }
 
 func (pt *bls12Point2) Copy() Point2 {
-	result := bls12Point2{pt.point.Copy()}
+	result := bls12Point2{pt.point.Copy().(*bls12.G2)}
 	return &result
 }
 
