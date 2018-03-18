@@ -31,16 +31,16 @@ func tryAndIncrement64(message []byte, hashfunc func(message []byte) [64]byte, c
 		root := calcQuadRes(ySqr, q)
 		rootSqr := new(big.Int).Exp(root, two, q)
 		if rootSqr.Cmp(ySqr) == 0 {
-			other_root := py.Sub(q, py)
+			otherRoot := py.Sub(q, py)
 			// Set root to the canonical square root.
-			root, other_root = sortBigInts(root, other_root)
+			root, otherRoot = sortBigInts(root, otherRoot)
 			// Use the canonical root for py, unless the cofactor is one, in which case
 			// use an extra bit to determine parity.
 			py = root
 			if curve.getG1Cofactor().Cmp(one) == 0 {
 				signY := int(h[48]) % 2
 				if signY == 1 {
-					py = other_root
+					py = otherRoot
 					break
 				}
 			}
@@ -99,13 +99,13 @@ func fouqueTibouchiG1(curve CurveSystem, t *big.Int, blind bool) (Point1, bool) 
 // TODO Don't calculate unneccessary x values in unblinded case.
 func sw(curve CurveSystem, t *big.Int, blind bool) (Point1, bool) {
 	var x [3]*big.Int
-
-	//w = sqrt(-3)*t / (1 + b + t^2)
-	w := new(big.Int)
 	b := curve.getG1B()
 	q := curve.getG1Q()
 	qDiv2 := curve.getG1QDivTwo()
 	rootNeg3, neg1SubRootNeg3 := curve.getFTHashParams()
+
+	//w = sqrt(-3)*t / (1 + b + t^2)
+	w := new(big.Int)
 	w.Exp(t, two, q)
 	w.Add(w, one)
 	w.Add(w, b)
@@ -115,37 +115,50 @@ func sw(curve CurveSystem, t *big.Int, blind bool) (Point1, bool) {
 	w.Mul(w, rootNeg3)
 	w.Mod(w, q)
 
-	//x[0] = (-1 + sqrt(-3))/2 - t*w
-	x[0] = new(big.Int)
-	x[0].Mul(t, w)
-	x[0].Mod(x[0], q)
-	x[0].Sub(q, x[0])
-	x[0].Add(x[0], neg1SubRootNeg3)
-	x[0].Mod(x[0], q)
+	alpha := int64(0)
+	beta := int64(0)
+	i := 0
 
-	//x[1] = -1 - x[1]
-	x[1] = new(big.Int)
-	x[1].Neg(x[0])
-	x[1].Sub(x[1], one)
-	x[1].Mod(x[1], q)
+	for i = 0; i < 3; i++ {
+		if i == 0 {
+			//x[0] = (-1 + sqrt(-3))/2 - t*w
+			x[0] = new(big.Int)
+			x[0].Mul(t, w)
+			x[0].Mod(x[0], q)
+			x[0].Sub(q, x[0])
+			x[0].Add(x[0], neg1SubRootNeg3)
+			x[0].Mod(x[0], q)
 
-	//x[2] = 1 + 1/w^2
-	x[2] = new(big.Int)
-	x[2].Exp(w, two, q)
-	x[2].ModInverse(x[2], q)
-	x[2].Add(x[2], one)
-	x[2].Mod(x[2], q)
+			// If blinding isn't needed, utilize conditional branches.
+			alpha = chkPoint(x[0], curve, q, blind)
+			if !blind && alpha == 1 {
+				break
+			}
+		} else if i == 1 {
+			//x[1] = -1 - x[1]
+			x[1] = new(big.Int)
+			x[1].Neg(x[0])
+			x[1].Sub(x[1], one)
+			x[1].Mod(x[1], q)
+
+			beta = chkPoint(x[1], curve, q, blind)
+			if !blind && beta == 1 {
+				break
+			}
+		} else {
+			//x[2] = 1 + 1/w^2
+			x[2] = new(big.Int)
+			x[2].Exp(w, two, q)
+			x[2].ModInverse(x[2], q)
+			x[2].Add(x[2], one)
+			x[2].Mod(x[2], q)
+			break
+		}
+	}
 
 	//i = first x[i] such that (x^3 + b) is square
-	i := int64(2)
 	if blind {
-		i = (((chkPoint(x[0], curve, q, blind) - 1) * chkPoint(x[1], curve, q, blind)) + 3) % 3
-	} else { // If blinding isn't needed, utilize conditional branches.
-		if chkPoint(x[0], curve, q, blind) == 1 {
-			i = 0
-		} else if chkPoint(x[1], curve, q, blind) == 1 {
-			i = 1
-		}
+		i = int((((alpha - 1) * beta) + 3) % 3)
 	}
 
 	// TODO Add blinded form of this
@@ -153,7 +166,8 @@ func sw(curve CurveSystem, t *big.Int, blind bool) (Point1, bool) {
 	if parity(y, qDiv2) != parity(t, qDiv2) {
 		y.Sub(q, y)
 	}
-	return curve.MakeG1Point(x[i], y)
+	// Check is set to false since its guaranteed to be on the curve
+	return curve.MakeG1Point(x[i], y, false)
 }
 
 func parity(x *big.Int, qdiv2 *big.Int) int {

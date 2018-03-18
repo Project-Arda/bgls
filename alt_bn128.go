@@ -33,7 +33,8 @@ type altbn128PointT struct {
 var Altbn128 = &altbn128{}
 
 // MakeG1Point copies points into []byte and unmarshals to get around curvePoint not being exported
-func (curve *altbn128) MakeG1Point(x, y *big.Int) (Point1, bool) {
+// Note that check does nothing here, because the upstream library checks that the point is on the curve.
+func (curve *altbn128) MakeG1Point(x, y *big.Int, check bool) (Point1, bool) {
 	xBytes, yBytes := x.Bytes(), y.Bytes()
 	ret := make([]byte, 64)
 	copy(ret[32-len(xBytes):], xBytes)
@@ -249,7 +250,7 @@ func (curve *altbn128) UnmarshalG1(data []byte) (Point1, bool) {
 		}
 		x := new(big.Int).SetBytes(data)
 		if x.Cmp(zero) == 0 {
-			return Altbn128.MakeG1Point(zero, zero)
+			return Altbn128.MakeG1Point(zero, zero, false)
 		}
 		y := Altbn128.g1XToYSquared(x)
 		// Underlying library already checks that y is on the curve, thus isQuadRes isn't checked here
@@ -262,7 +263,7 @@ func (curve *altbn128) UnmarshalG1(data []byte) (Point1, bool) {
 		} else if !ySgn && cmpRes == 1 {
 			y.Sub(altbnG1Q, y)
 		}
-		return Altbn128.MakeG1Point(x, y)
+		return Altbn128.MakeG1Point(x, y, true)
 	}
 	return nil, false
 }
@@ -437,7 +438,7 @@ func AltbnKang12(message []byte) (p1, p2 *big.Int) {
 // The return value is the altbn_128 library's internel representation for points.
 func (curve *altbn128) HashToG1(message []byte) Point1 {
 	x, y := AltbnKeccak3(message)
-	p, _ := curve.MakeG1Point(x, y)
+	p, _ := curve.MakeG1Point(x, y, false)
 	return p
 }
 

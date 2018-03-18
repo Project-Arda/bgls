@@ -32,19 +32,6 @@ func TestAltbnHashToCurve(t *testing.T) {
 	}
 }
 
-// func TestBls12Hashing(t *testing.T) {
-// 	// Tests consistency
-// 	N := 10
-// 	msgs := make([][]byte, N)
-// 	for i := 0; i < N; i++ {
-// 		msgs[i] = make([]byte, N)
-// 		_, _ = rand.Read(msgs[i])
-// 		testHashConsistency(Bls12Sha3, "bls12 sha3 hash", msgs[i], t)
-// 		testHashConsistency(Bls12Kang12, "bls12 kang12 hash", msgs[i], t)
-// 		testHashConsistency(Bls12Blake2b, "bls12 blake2b hash", msgs[i], t)
-// 	}
-// }
-
 func testHashConsistency(hashFunc func(message []byte) (p1, p2 *big.Int), hashname string, msg []byte, t *testing.T) {
 	x1, y1 := hashFunc(msg)
 	x2, y2 := hashFunc(msg)

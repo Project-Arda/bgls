@@ -28,9 +28,9 @@ type bls12PointT struct {
 // Bls12 is the instance for the bls12 curve, with all of its functions.
 var Bls12 = &bls12Curve{}
 
-func (g1Point *bls12Point1) Add(otherPoint1 Point1) (Point1, bool) {
-	g1Copy, _ := g1Point.Copy().(*bls12Point1)
-	if other, ok := (otherPoint1).(*bls12Point1); ok {
+func (pt *bls12Point1) Add(otherPt Point1) (Point1, bool) {
+	g1Copy, _ := pt.Copy().(*bls12Point1)
+	if other, ok := (otherPt).(*bls12Point1); ok {
 		sum := g1Copy.point.Add(other.point).(*bls12.G1)
 		ret := &bls12Point1{sum}
 		return ret, true
@@ -70,8 +70,8 @@ func (pt *bls12Point1) ToAffineCoords() (x, y *big.Int) {
 	return blsx.ToInt()[0], blsy.ToInt()[0]
 }
 
-func (pt *bls12Point1) Pair(g2Point Point2) (PointT, bool) {
-	if other, ok := (g2Point).(*bls12Point2); ok {
+func (pt *bls12Point1) Pair(otherPt Point2) (PointT, bool) {
+	if other, ok := (otherPt).(*bls12Point2); ok {
 		p3 := new(bls12.GT).Pair(pt.point, other.point)
 		ret := bls12PointT{p3}
 		return ret, true
@@ -159,10 +159,10 @@ func (pt bls12PointT) Mul(scalar *big.Int) PointT {
 	return prod
 }
 
-func (curve *bls12Curve) MakeG1Point(x, y *big.Int) (Point1, bool) {
+func (curve *bls12Curve) MakeG1Point(x, y *big.Int, check bool) (Point1, bool) {
 	pt := new(bls12.G1)
 	pt.SetXY(bls12.FqFromInt(x), bls12.FqFromInt(y))
-	if !pt.Check() {
+	if check && !pt.Check() {
 		return nil, false
 	}
 	return &bls12Point1{pt}, true
@@ -254,36 +254,59 @@ var bls12SqrtNeg3, _ = new(big.Int).SetString("158695878145843102524275940326684
 var bls12Cofactor, _ = new(big.Int).SetString("76329603384216526031706109802092473003", 10)
 var bls12Order, _ = new(big.Int).SetString("52435875175126190479447740508185965837690552500527637822603658699938581184513", 10)
 var bls12GT, _ = Bls12.GetG1().Pair(Bls12.GetG2())
-var bls12G1Tag = []byte("G1_x")
+var bls12G1Tag1 = []byte("\x00G1_x")
+var bls12G1Tag2 = []byte("\xffG1_x")
 
 var bls12FTRoot1, _ = new(big.Int).SetString("248294325734266649657405162895821171812231848760181225578082735178502750823719347628762635478508544819911854747095", 10)
 var bls12FTRoot2, _ = new(big.Int).SetString("3754115229487400743760384662840082984744650971178826659753975400945528899667118516813924993650507119217982417812692", 10)
 
 // Fouque Tibouchi hashing as specified in https://github.com/ebfull/pairing/pull/30
 func (curve *bls12Curve) HashToG1(message []byte) Point1 {
-	tBytes := bls12G1blake2b(message)
+	t1Bytes := bls12G1pt1blake2b(message)
+	pt1 := bls12FouqueTibouchi(t1Bytes)
+	t2Bytes := bls12G1pt2blake2b(message)
+	pt2 := bls12FouqueTibouchi(t2Bytes)
+
+	pt1, _ = pt1.Add(pt2)
+	pt1 = pt1.Mul(curve.getG1Cofactor())
+	return pt1
+}
+
+func bls12FouqueTibouchi(tBytes [64]byte) Point1 {
 	t := new(big.Int).SetBytes(tBytes[:])
-	t.Mod(t, curve.getG1Q())
+	t.Mod(t, Bls12.getG1Q())
 	// Explicitly handle undefined t
 	if t.Cmp(zero) == 0 {
-		pt, _ := curve.MakeG1Point(zero, zero)
+		pt, _ := Bls12.MakeG1Point(zero, zero, false)
 		return pt
 	} else if t.Cmp(bls12FTRoot1) == 0 {
-		return curve.GetG1()
+		return Bls12.GetG1()
 	} else if t.Cmp(bls12FTRoot2) == 0 {
 		pt := new(bls12.G1)
-		g1x, g1y := curve.GetG1().ToAffineCoords()
+		g1x, g1y := Bls12.GetG1().ToAffineCoords()
 		g1y.Sub(bls12Q, g1y)
 		pt.SetXY(bls12.FqFromInt(g1x), bls12.FqFromInt(g1y))
 		return &bls12Point1{pt}
 	}
+
 	pt, _ := fouqueTibouchiG1(Bls12, t, false)
 	return pt
 }
 
-// bls12G1blake2b returns Blake2b(message || CurveDescription || Tag)
+// bls12G1pt1blake2b returns Blake2b(message || \x00 || Tag)
 // This is done in correspondence to the current conversation going on at
 // https://github.com/ebfull/pairing/pull/30
-func bls12G1blake2b(message []byte) [64]byte {
-	return blake2b.Sum512(append(message, bls12G1Tag...))
+// A null byte is appended to the message (done inside of the tag), in
+// accordance with what the rust code is currently doing.
+func bls12G1pt1blake2b(message []byte) [64]byte {
+	return blake2b.Sum512(append(message, bls12G1Tag1...))
+}
+
+// bls12G1pt2blake2b returns Blake2b(message || \xff || Tag)
+// This is done in correspondence to the current conversation going on at
+// https://github.com/ebfull/pairing/pull/30
+// A null byte is appended to the message (done inside of the tag), in
+// accordance with what the rust code is currently doing.
+func bls12G1pt2blake2b(message []byte) [64]byte {
+	return blake2b.Sum512(append(message, bls12G1Tag2...))
 }
