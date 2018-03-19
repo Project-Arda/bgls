@@ -14,30 +14,6 @@ import (
 
 var curves = []CurveSystem{Altbn128, Bls12}
 
-func TestAltbnHashToCurve(t *testing.T) {
-	curve := Altbn128
-	N := 10
-	msgs := make([][]byte, N)
-	for i := 0; i < N; i++ {
-		msgs[i] = make([]byte, N)
-		_, _ = rand.Read(msgs[i])
-
-		testHashConsistency(AltbnSha3, "altbn sha3 hash", msgs[i], t)
-		testHashConsistency(AltbnKang12, "altbn kang12 hash", msgs[i], t)
-		testHashConsistency(AltbnBlake2b, "altbn blake2b hash", msgs[i], t)
-
-		p1 := curve.HashToG1(msgs[i])
-		p2 := curve.HashToG1(msgs[i])
-		assert.True(t, p1.Equals(p2), "inconsistent results in Altbn HashToCurve")
-	}
-}
-
-func testHashConsistency(hashFunc func(message []byte) (p1, p2 *big.Int), hashname string, msg []byte, t *testing.T) {
-	x1, y1 := hashFunc(msg)
-	x2, y2 := hashFunc(msg)
-	assert.True(t, x1.Cmp(x2) == 0 && y1.Cmp(y2) == 0, "inconsistent results in "+hashname)
-}
-
 func TestEthereumHash(t *testing.T) {
 	curve := Altbn128
 	// Tests Altbn hash to curve against known solidity test case.

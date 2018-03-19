@@ -54,6 +54,7 @@ func (pt *bls12Point1) Marshal() []byte {
 	return pt.point.Marshal()
 }
 
+// TODO Make this match ebfull/pairing marshalling.
 func (pt *bls12Point1) MarshalUncompressed() []byte {
 	return pt.point.MarshalUncompressed()
 }
@@ -105,6 +106,7 @@ func (pt *bls12Point2) Marshal() []byte {
 	return pt.point.Marshal()
 }
 
+// TODO Make this match ebfull/pairing marshalling.
 func (pt *bls12Point2) MarshalUncompressed() []byte {
 	return pt.point.MarshalUncompressed()
 }
@@ -262,19 +264,31 @@ var bls12FTRoot2, _ = new(big.Int).SetString("3754115229487400743760384662840082
 
 // Fouque Tibouchi hashing as specified in https://github.com/ebfull/pairing/pull/30
 func (curve *bls12Curve) HashToG1(message []byte) Point1 {
+	return hashToG1BlindingAbstracted(message, false)
+}
+
+// Fouque Tibouchi hashing as specified in https://github.com/ebfull/pairing/pull/30
+// This also adds time blinding
+func (curve *bls12Curve) HashToG1Blind(message []byte) Point1 {
+	return hashToG1BlindingAbstracted(message, true)
+}
+
+// This hashes a given message to G1, and the second parameter specifies whether
+// or not to blind the computation, to prevent timing information from being leaked.
+func hashToG1BlindingAbstracted(message []byte, blind bool) Point1 {
 	t1Bytes := bls12G1pt1blake2b(message)
-	pt1 := bls12FouqueTibouchi(t1Bytes)
+	pt1 := bls12FouqueTibouchi(t1Bytes, blind)
 	t2Bytes := bls12G1pt2blake2b(message)
-	pt2 := bls12FouqueTibouchi(t2Bytes)
+	pt2 := bls12FouqueTibouchi(t2Bytes, blind)
 
 	pt1, _ = pt1.Add(pt2)
-	pt1 = pt1.Mul(curve.getG1Cofactor())
+	pt1 = pt1.Mul(bls12Cofactor)
 	return pt1
 }
 
-func bls12FouqueTibouchi(tBytes [64]byte) Point1 {
+func bls12FouqueTibouchi(tBytes [64]byte, blind bool) Point1 {
 	t := new(big.Int).SetBytes(tBytes[:])
-	t.Mod(t, Bls12.getG1Q())
+	t.Mod(t, bls12Q)
 	// Explicitly handle undefined t
 	if t.Cmp(zero) == 0 {
 		pt, _ := Bls12.MakeG1Point(zero, zero, false)
@@ -289,7 +303,7 @@ func bls12FouqueTibouchi(tBytes [64]byte) Point1 {
 		return &bls12Point1{pt}
 	}
 
-	pt, _ := fouqueTibouchiG1(Bls12, t, false)
+	pt, _ := fouqueTibouchiG1(Bls12, t, blind)
 	return pt
 }
 

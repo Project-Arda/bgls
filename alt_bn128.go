@@ -426,13 +426,6 @@ func AltbnBlake2b(message []byte) (p1, p2 *big.Int) {
 	return
 }
 
-// AltbnKang12 Hashes a message to a point on Altbn128 using Blake2b and try and increment
-// The return value is the x,y affine coordinate pair.
-func AltbnKang12(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = tryAndIncrement64(message, kang12_64, Altbn128)
-	return
-}
-
 // HashToG1 Hashes a message to a point on Altbn128 using Keccak3 and try and increment
 // This is for compatability with Ethereum hashing.
 // The return value is the altbn_128 library's internel representation for points.

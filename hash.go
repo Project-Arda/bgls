@@ -6,8 +6,6 @@ package bgls
 import (
 	"crypto/rand"
 	"math/big"
-
-	"github.com/mimoo/GoKangarooTwelve/K12"
 )
 
 var zero = big.NewInt(0)
@@ -96,7 +94,6 @@ func fouqueTibouchiG1(curve CurveSystem, t *big.Int, blind bool) (Point1, bool) 
 
 // Shallue - van de Woestijne encoding
 // from "Indifferentiable Hashing to Barreto–Naehrig Curves"
-// TODO Don't calculate unneccessary x values in unblinded case.
 func sw(curve CurveSystem, t *big.Int, blind bool) (Point1, bool) {
 	var x [3]*big.Int
 	b := curve.getG1B()
@@ -268,16 +265,4 @@ func isQuadRes(a *big.Int, q *big.Int) bool {
 		return true
 	}
 	return false
-}
-
-// 64 byte kangaroo twelve hash
-func kang12_64(messageDat []byte) [64]byte {
-	inputByte := make([]byte, 1)
-	hashFunc := K12.NewK12(inputByte)
-	hashFunc.Write(messageDat)
-	out := make([]byte, 64)
-	hashFunc.Read(out)
-	x := [64]byte{}
-	copy(x[:], out[:64])
-	return x
 }
