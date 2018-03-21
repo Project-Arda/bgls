@@ -33,7 +33,8 @@ type altbn128PointT struct {
 var Altbn128 = &altbn128{}
 
 // MakeG1Point copies points into []byte and unmarshals to get around curvePoint not being exported
-func (curve *altbn128) MakeG1Point(x, y *big.Int) (Point1, bool) {
+// Note that check does nothing here, because the upstream library checks that the point is on the curve.
+func (curve *altbn128) MakeG1Point(x, y *big.Int, check bool) (Point1, bool) {
 	xBytes, yBytes := x.Bytes(), y.Bytes()
 	ret := make([]byte, 64)
 	copy(ret[32-len(xBytes):], xBytes)
@@ -77,6 +78,10 @@ func (g1Point *altbn128Point1) Marshal() []byte {
 		xBytes[0] += 128
 	}
 	return xBytes
+}
+
+func (g1Point *altbn128Point1) MarshalUncompressed() []byte {
+	return g1Point.point.Marshal()
 }
 
 func pad32Bytes(xBytes []byte) []byte {
@@ -176,6 +181,10 @@ func (g2Point *altbn128Point2) Marshal() []byte {
 	return xBytes
 }
 
+func (g2Point *altbn128Point2) MarshalUncompressed() []byte {
+	return g2Point.point.Marshal()
+}
+
 func (g2Point *altbn128Point2) Mul(scalar *big.Int) Point2 {
 	prod := new(bn256.G2).ScalarMult(g2Point.point, scalar)
 	ret := &altbn128Point2{prod}
@@ -241,19 +250,20 @@ func (curve *altbn128) UnmarshalG1(data []byte) (Point1, bool) {
 		}
 		x := new(big.Int).SetBytes(data)
 		if x.Cmp(zero) == 0 {
-			return Altbn128.MakeG1Point(zero, zero)
+			return Altbn128.MakeG1Point(zero, zero, false)
 		}
 		y := Altbn128.g1XToYSquared(x)
 		// Underlying library already checks that y is on the curve, thus isQuadRes isn't checked here
 		y = calcQuadRes(y, altbnG1Q)
 		doubleY := new(big.Int).Mul(y, two)
+		// TODO switch this to use the parity method
 		cmpRes := doubleY.Cmp(altbnG1Q)
 		if ySgn && cmpRes == -1 {
 			y.Sub(altbnG1Q, y)
 		} else if !ySgn && cmpRes == 1 {
 			y.Sub(altbnG1Q, y)
 		}
-		return Altbn128.MakeG1Point(x, y)
+		return Altbn128.MakeG1Point(x, y, true)
 	}
 	return nil, false
 }
@@ -329,6 +339,10 @@ func (curve *altbn128) getG1Q() *big.Int {
 	return altbnG1Q
 }
 
+func (curve *altbn128) getG1QDivTwo() *big.Int {
+	return altbnG1QDiv2
+}
+
 func (curve *altbn128) getG1Order() *big.Int {
 	return altbnG1Order
 }
@@ -359,9 +373,18 @@ func (curve *altbn128) GetGT() PointT {
 	return altbnGT
 }
 
+func (curve *altbn128) getG1Cofactor() *big.Int {
+	return one
+}
+
+func (curve *altbn128) getFTHashParams() (*big.Int, *big.Int) {
+	return altbnSqrtn3, altbnZ
+}
+
 //curve specific constants
 var altbnG1B = big.NewInt(3)
 var altbnG1Q, _ = new(big.Int).SetString("21888242871839275222246405745257275088696311157297823662689037894645226208583", 10)
+var altbnG1QDiv2 = new(big.Int).Div(altbnG1Q, two)
 
 var altbnG2BRe, _ = new(big.Int).SetString("19485874751759354771024239261021720505790618469301721065564631296452457478373", 10)
 var altbnG2BIm, _ = new(big.Int).SetString("266929791119991161246907387137283842545076965332900288569378510910307636690", 10)
@@ -384,7 +407,7 @@ var altbnG1Order, _ = new(big.Int).SetString("2188824287183927522224640574525727
 // AltbnSha3 Hashes a message to a point on Altbn128 using SHA3 and try and increment
 // The return value is the x,y affine coordinate pair.
 func AltbnSha3(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash64(message, sha3.Sum512, Altbn128)
+	p1, p2 = tryAndIncrement64(message, sha3.Sum512, Altbn128)
 	return
 }
 
@@ -392,21 +415,14 @@ func AltbnSha3(message []byte) (p1, p2 *big.Int) {
 // Keccak3 is only for compatability with Ethereum hashing.
 // The return value is the x,y affine coordinate pair.
 func AltbnKeccak3(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash32(message, EthereumSum256, Altbn128)
+	p1, p2 = tryAndIncrementEvm(message, EthereumSum256, Altbn128)
 	return
 }
 
 // AltbnBlake2b Hashes a message to a point on Altbn128 using Blake2b and try and increment
 // The return value is the x,y affine coordinate pair.
 func AltbnBlake2b(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash64(message, blake2b.Sum512, Altbn128)
-	return
-}
-
-// AltbnKang12 Hashes a message to a point on Altbn128 using Blake2b and try and increment
-// The return value is the x,y affine coordinate pair.
-func AltbnKang12(message []byte) (p1, p2 *big.Int) {
-	p1, p2 = hash64(message, kang12_64, Altbn128)
+	p1, p2 = tryAndIncrement64(message, blake2b.Sum512, Altbn128)
 	return
 }
 
@@ -415,7 +431,7 @@ func AltbnKang12(message []byte) (p1, p2 *big.Int) {
 // The return value is the altbn_128 library's internel representation for points.
 func (curve *altbn128) HashToG1(message []byte) Point1 {
 	x, y := AltbnKeccak3(message)
-	p, _ := curve.MakeG1Point(x, y)
+	p, _ := curve.MakeG1Point(x, y, false)
 	return p
 }
 

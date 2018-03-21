@@ -10,7 +10,7 @@ import (
 // CurveSystem is a set of parameters and functions for a pairing based cryptosystem
 // It has everything necessary to support all bgls functionality which we use.
 type CurveSystem interface {
-	MakeG1Point(*big.Int, *big.Int) (Point1, bool)
+	MakeG1Point(*big.Int, *big.Int, bool) (Point1, bool)
 	// MakeG2Point(*big.Int, *big.Int, *big.Int, *big.Int) (Point2, bool)
 	// MakeGTPoint(*big.Int, *big.Int) (PointT, bool)
 
@@ -28,10 +28,15 @@ type CurveSystem interface {
 	HashToG1(message []byte) Point1
 
 	getG1Q() *big.Int
+	getG1QDivTwo() *big.Int
 	// getGTQ() *big.Int
+
+	getG1Cofactor() *big.Int
 
 	getG1A() *big.Int
 	getG1B() *big.Int
+	// Fouque-Tibouchi hash parameters, sqrt(-3), (-1 + sqrt(-3))/2 computed in F_q
+	getFTHashParams() (*big.Int, *big.Int)
 	getG1Order() *big.Int
 	g1XToYSquared(*big.Int) *big.Int
 }
@@ -42,6 +47,7 @@ type Point1 interface {
 	Copy() Point1
 	Equals(Point1) bool
 	Marshal() []byte
+	MarshalUncompressed() []byte
 	Mul(*big.Int) Point1
 	Pair(Point2) (PointT, bool)
 	ToAffineCoords() (*big.Int, *big.Int)
@@ -53,6 +59,7 @@ type Point2 interface {
 	Copy() Point2
 	Equals(Point2) bool
 	Marshal() []byte
+	MarshalUncompressed() []byte
 	Mul(*big.Int) Point2
 	ToAffineCoords() (*big.Int, *big.Int, *big.Int, *big.Int)
 }

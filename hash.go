@@ -4,9 +4,8 @@
 package bgls
 
 import (
+	"crypto/rand"
 	"math/big"
-
-	"github.com/mimoo/GoKangarooTwelve/K12"
 )
 
 var zero = big.NewInt(0)
@@ -15,68 +14,170 @@ var two = big.NewInt(2)
 var three = big.NewInt(3)
 var four = big.NewInt(4)
 
-// 64 byte kangaroo twelve hash
-func kang12_64(messageDat []byte) [64]byte {
-	inputByte := make([]byte, 1)
-	hashFunc := K12.NewK12(inputByte)
-	hashFunc.Write(messageDat)
-	out := make([]byte, 64)
-	hashFunc.Read(out)
-	x := [64]byte{}
-	copy(x[:], out[:64])
-	return x
-}
-
 // 64 byte hash
-func hash64(message []byte, hashfunc func(message []byte) [64]byte, curve CurveSystem) (px, py *big.Int) {
-	c := 0
+func tryAndIncrement64(message []byte, hashfunc func(message []byte) [64]byte, curve CurveSystem) (px, py *big.Int) {
+	counter := []byte{byte(0)}
 	px = new(big.Int)
 	py = new(big.Int)
 	q := curve.getG1Q()
 	for {
-		h := hashfunc(append(message, byte(c)))
+		h := hashfunc(append(counter, message...))
+		counter[0]++
 		px.SetBytes(h[:48])
 		px.Mod(px, q)
 		ySqr := curve.g1XToYSquared(px)
-		if isQuadRes(ySqr, q) == true {
-			py = calcQuadRes(ySqr, q)
-			signY := int(h[48]) % 2
-			if signY == 1 {
-				py.Sub(q, py)
+		root := calcQuadRes(ySqr, q)
+		rootSqr := new(big.Int).Exp(root, two, q)
+		if rootSqr.Cmp(ySqr) == 0 {
+			otherRoot := py.Sub(q, py)
+			// Set root to the canonical square root.
+			root, otherRoot = sortBigInts(root, otherRoot)
+			// Use the canonical root for py, unless the cofactor is one, in which case
+			// use an extra bit to determine parity.
+			py = root
+			if curve.getG1Cofactor().Cmp(one) == 0 {
+				signY := int(h[48]) % 2
+				if signY == 1 {
+					py = otherRoot
+					break
+				}
 			}
 			break
 		}
-		c++
 	}
 	return
 }
 
-// 32 byte hash which complies with standards we are using in the solidity contract.
-func hash32(message []byte, hashfunc func(message []byte) [32]byte, curve CurveSystem) (px, py *big.Int) {
-	c := 0
+// Try and Increment hashing that is meant to comply with the standards we are using in the solidity contract.
+// This is not recommended for use anywhere else.
+func tryAndIncrementEvm(message []byte, hashfunc func(message []byte) [32]byte, curve CurveSystem) (px, py *big.Int) {
+	counter := []byte{byte(0)}
 	px = new(big.Int)
 	py = new(big.Int)
 	q := curve.getG1Q()
 	for {
-		h := hashfunc(append(message, byte(c)))
+		h := hashfunc(append(counter, message...))
+		counter[0]++
 		px.SetBytes(h[:32])
 		px.Mod(px, q)
 		ySqr := curve.g1XToYSquared(px)
-		if isQuadRes(ySqr, q) == true {
-			py = calcQuadRes(ySqr, q)
-			signY := hashfunc(append(message, byte(255)))[31] % 2
+		root := calcQuadRes(ySqr, q)
+		rootSqr := new(big.Int).Exp(root, two, q)
+		if rootSqr.Cmp(ySqr) == 0 {
+			py = root
+			counter[0] = byte(255)
+			signY := hashfunc(append(counter, message...))[31] % 2
 			if signY == 1 {
 				py.Sub(q, py)
 			}
 			break
 		}
-		c++
 	}
 	return
+}
+
+func sortBigInts(b1 *big.Int, b2 *big.Int) (*big.Int, *big.Int) {
+	if b1.Cmp(b2) > 0 {
+		return b2, b1
+	}
+	return b1, b2
+}
+
+func fouqueTibouchiG1(curve CurveSystem, t *big.Int, blind bool) (Point1, bool) {
+	pt, ok := sw(curve, t, blind)
+	if !ok {
+		return nil, false
+	}
+	pt = pt.Mul(curve.getG1Cofactor())
+	return pt, true
+}
+
+// Shallue - van de Woestijne encoding
+// from "Indifferentiable Hashing to Barreto–Naehrig Curves"
+func sw(curve CurveSystem, t *big.Int, blind bool) (Point1, bool) {
+	var x [3]*big.Int
+	b := curve.getG1B()
+	q := curve.getG1Q()
+	qDiv2 := curve.getG1QDivTwo()
+	rootNeg3, neg1SubRootNeg3 := curve.getFTHashParams()
+
+	//w = sqrt(-3)*t / (1 + b + t^2)
+	w := new(big.Int)
+	w.Exp(t, two, q)
+	w.Add(w, one)
+	w.Add(w, b)
+	w.ModInverse(w, q)
+	w.Mul(w, t)
+	w.Mod(w, q)
+	w.Mul(w, rootNeg3)
+	w.Mod(w, q)
+
+	alpha := int64(0)
+	beta := int64(0)
+	i := 0
+
+	for i = 0; i < 3; i++ {
+		if i == 0 {
+			//x[0] = (-1 + sqrt(-3))/2 - t*w
+			x[0] = new(big.Int)
+			x[0].Mul(t, w)
+			x[0].Mod(x[0], q)
+			x[0].Sub(q, x[0])
+			x[0].Add(x[0], neg1SubRootNeg3)
+			x[0].Mod(x[0], q)
+
+			// If blinding isn't needed, utilize conditional branches.
+			alpha = chkPoint(x[0], curve, q, blind)
+			if !blind && alpha == 1 {
+				break
+			}
+		} else if i == 1 {
+			//x[1] = -1 - x[1]
+			x[1] = new(big.Int)
+			x[1].Neg(x[0])
+			x[1].Sub(x[1], one)
+			x[1].Mod(x[1], q)
+
+			beta = chkPoint(x[1], curve, q, blind)
+			if !blind && beta == 1 {
+				break
+			}
+		} else {
+			//x[2] = 1 + 1/w^2
+			x[2] = new(big.Int)
+			x[2].Exp(w, two, q)
+			x[2].ModInverse(x[2], q)
+			x[2].Add(x[2], one)
+			x[2].Mod(x[2], q)
+			break
+		}
+	}
+
+	//i = first x[i] such that (x^3 + b) is square
+	if blind {
+		i = int((((alpha - 1) * beta) + 3) % 3)
+	}
+
+	// TODO Add blinded form of this
+	y := calcQuadRes(curve.g1XToYSquared(x[i]), q)
+	if parity(y, qDiv2) != parity(t, qDiv2) {
+		y.Sub(q, y)
+	}
+	// Check is set to false since its guaranteed to be on the curve
+	return curve.MakeG1Point(x[i], y, false)
+}
+
+func parity(x *big.Int, qdiv2 *big.Int) int {
+	if x.Cmp(qdiv2) < 1 {
+		return 1
+	}
+	return 0
 }
 
 // Currently implementing first method from
 // http://mathworld.wolfram.com/QuadraticResidue.html
+// Experimentally, this seems to always return the canonical square root,
+// however I haven't seen a proof of this.
 func calcQuadRes(ySqr *big.Int, q *big.Int) *big.Int {
 	resMod4 := new(big.Int).Mod(q, four)
 	if resMod4.Cmp(three) == 0 {
@@ -122,6 +223,34 @@ func calcComplexQuadRes(ySqr *complexNum, q *big.Int) *complexNum {
 	result.im.Mod(result.im, q)
 	result.re.Mod(result.re, q)
 	return result
+}
+
+//generates a random member of Fq such that it is a square
+func randSquare(q *big.Int) *big.Int {
+	var r, _ = rand.Int(rand.Reader, q)
+	return r.Exp(r, two, q)
+}
+
+// If blind is true, this blinds k with a random square in Fq,
+// and then returns square root. This can be done to limit timing leakage.
+// This returns the quadratic character of k.
+func quadraticCharacter(k *big.Int, q *big.Int, blind bool) int64 {
+	r := k
+	if blind {
+		r = randSquare(q)
+		r.Mul(r, k)
+		r.Mod(r, q)
+	}
+	res := isQuadRes(r, q)
+	if res {
+		return 1
+	}
+	return -1
+}
+
+//checks that (x^3 + b) is a square in Fq
+func chkPoint(x *big.Int, curve CurveSystem, q *big.Int, mask bool) int64 {
+	return quadraticCharacter(curve.g1XToYSquared(x), q, mask)
 }
 
 // Implement Eulers Criterion
