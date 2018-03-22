@@ -1,7 +1,7 @@
 // Copyright (C) 2018 Authors
 // distributed under Apache 2.0 license
 
-package bgls
+package curves
 
 import (
 	"math/big"
@@ -217,7 +217,7 @@ func (curve *bls12Curve) getG1B() *big.Int {
 	return bls12B
 }
 
-func (curve *bls12Curve) getG1Q() *big.Int {
+func (curve *bls12Curve) GetG1Q() *big.Int {
 	return bls12Q
 }
 
@@ -234,7 +234,7 @@ func (curve *bls12Curve) g1XToYSquared(x *big.Int) *big.Int {
 	return y.ToInt()[0]
 }
 
-func (curve *bls12Curve) getG1Order() *big.Int {
+func (curve *bls12Curve) GetG1Order() *big.Int {
 	return bls12Order
 }
 

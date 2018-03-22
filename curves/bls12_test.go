@@ -1,7 +1,7 @@
 // Copyright (C) 2018 Authors
 // distributed under Apache 2.0 license
 
-package bgls
+package curves
 
 import (
 	"crypto/rand"
