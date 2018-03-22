@@ -5,8 +5,9 @@ package bgls
 
 import (
 	"crypto/rand"
-
 	"math/big"
+
+	. "github.com/Project-Arda/bgls/curves"
 )
 
 //MultiSig holds set of keys and one message plus signature
@@ -25,7 +26,7 @@ type AggSig struct {
 
 //KeyGen generates a *big.Int and Point2
 func KeyGen(curve CurveSystem) (*big.Int, Point2, error) {
-	x, err := rand.Int(rand.Reader, curve.getG1Order())
+	x, err := rand.Int(rand.Reader, curve.GetG1Order())
 	if err != nil {
 		return nil, nil, err
 	}

@@ -1,7 +1,7 @@
 // Copyright (C) 2018 Authors
 // distributed under Apache 2.0 license
 
-package bgls
+package curves
 
 import (
 	"math/big"
@@ -27,7 +27,8 @@ type CurveSystem interface {
 
 	HashToG1(message []byte) Point1
 
-	getG1Q() *big.Int
+	GetG1Q() *big.Int
+	GetG1Order() *big.Int
 	getG1QDivTwo() *big.Int
 	// getGTQ() *big.Int
 
@@ -37,7 +38,6 @@ type CurveSystem interface {
 	getG1B() *big.Int
 	// Fouque-Tibouchi hash parameters, sqrt(-3), (-1 + sqrt(-3))/2 computed in F_q
 	getFTHashParams() (*big.Int, *big.Int)
-	getG1Order() *big.Int
 	g1XToYSquared(*big.Int) *big.Int
 }
 

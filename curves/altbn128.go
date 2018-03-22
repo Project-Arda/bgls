@@ -1,7 +1,7 @@
 // Copyright (C) 2018 Authors
 // distributed under Apache 2.0 license
 
-package bgls
+package curves
 
 import (
 	"bytes"
@@ -335,7 +335,7 @@ func (curve *altbn128) getG1B() *big.Int {
 	return altbnG1B
 }
 
-func (curve *altbn128) getG1Q() *big.Int {
+func (curve *altbn128) GetG1Q() *big.Int {
 	return altbnG1Q
 }
 
@@ -343,7 +343,7 @@ func (curve *altbn128) getG1QDivTwo() *big.Int {
 	return altbnG1QDiv2
 }
 
-func (curve *altbn128) getG1Order() *big.Int {
+func (curve *altbn128) GetG1Order() *big.Int {
 	return altbnG1Order
 }
 

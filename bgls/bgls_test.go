@@ -6,41 +6,13 @@ package bgls
 import (
 	"crypto/rand"
 	"math/big"
-	"os"
 	"testing"
 
+	. "github.com/Project-Arda/bgls/curves"
 	"github.com/stretchr/testify/assert"
 )
 
 var curves = []CurveSystem{Altbn128, Bls12}
-
-func TestEthereumHash(t *testing.T) {
-	curve := Altbn128
-	// Tests Altbn hash to curve against known solidity test case.
-	a, _ := new(big.Int).SetString("9121282642809701931333593728297233225556711250127745709186816755779879923737", 10)
-	aBytes := a.Bytes()
-	x, y := AltbnKeccak3(aBytes)
-	expX, _ := new(big.Int).SetString("11423386531623885114587219621463106117140760157404497425836076043015227528156", 10)
-	expY, _ := new(big.Int).SetString("20262289731964024720969923714809935701428881933342918937283877214228227624643", 10)
-	assert.True(t, x.Cmp(expX) == 0 && y.Cmp(expY) == 0, "Hash does not match known Ethereum Output")
-	pt := curve.HashToG1(aBytes)
-	x2, y2 := pt.ToAffineCoords()
-	assert.True(t, x.Cmp(x2) == 0 && y.Cmp(y2) == 0, "Conversion of point to coordinates is not working")
-
-	xi, xr, yi, yr := altbnG2.ToAffineCoords()
-	knownxi, _ := new(big.Int).SetString("11559732032986387107991004021392285783925812861821192530917403151452391805634", 10)
-	knownxr, _ := new(big.Int).SetString("10857046999023057135944570762232829481370756359578518086990519993285655852781", 10)
-	knownyi, _ := new(big.Int).SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531", 10)
-	knownyr, _ := new(big.Int).SetString("8495653923123431417604973247489272438418190587263600148770280649306958101930", 10)
-
-	assert.Zero(t, xi.Cmp(knownxi), "xi doesn't match")
-	assert.Zero(t, xr.Cmp(knownxr), "xr doesn't match")
-	assert.Zero(t, yi.Cmp(knownyi), "yi doesn't match")
-	assert.Zero(t, yr.Cmp(knownyr), "yr doesn't match")
-
-	altG2, _ := curve.MakeG2Point(xi, xr, yi, yr)
-	assert.True(t, altG2.Equals(curve.GetG2()), "MakeG2Point Failed")
-}
 
 func TestSingleSigner(t *testing.T) {
 	for _, curve := range curves {
@@ -134,9 +106,9 @@ func TestMultiSig(t *testing.T) {
 func TestMarshal(t *testing.T) {
 	for _, curve := range curves {
 		numTests := 32
-		requiredScalars := []*big.Int{one, altbnG1Order}
+		requiredScalars := []*big.Int{big.NewInt(1), Altbn128.GetG1Order()}
 		for i := 0; i < numTests; i++ {
-			scalar, _ := rand.Int(rand.Reader, curve.getG1Order())
+			scalar, _ := rand.Int(rand.Reader, curve.GetG1Order())
 			if i < len(requiredScalars) {
 				scalar = requiredScalars[i]
 			}
@@ -292,20 +264,6 @@ func BenchmarkVerification(b *testing.B) {
 var vks []Point2
 var sgs []Point1
 var msg []byte
-
-func TestMain(m *testing.M) {
-	curve := Altbn128
-	vks = make([]Point2, 2048)
-	sgs = make([]Point1, 2048)
-	msg = make([]byte, 64)
-	rand.Read(msg)
-	for i := 0; i < 2048; i++ {
-		sk, vk, _ := KeyGen(curve)
-		vks[i] = vk
-		sgs[i] = Sign(curve, sk, msg)
-	}
-	os.Exit(m.Run())
-}
 
 func benchmulti(b *testing.B, k int) {
 	curve := Altbn128

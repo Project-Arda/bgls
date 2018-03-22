@@ -1,7 +1,7 @@
 // Copyright (C) 2018 Authors
 // distributed under Apache 2.0 license
 
-package bgls
+package curves
 
 import (
 	"crypto/rand"
@@ -19,7 +19,7 @@ func tryAndIncrement64(message []byte, hashfunc func(message []byte) [64]byte, c
 	counter := []byte{byte(0)}
 	px = new(big.Int)
 	py = new(big.Int)
-	q := curve.getG1Q()
+	q := curve.GetG1Q()
 	for {
 		h := hashfunc(append(counter, message...))
 		counter[0]++
@@ -54,7 +54,7 @@ func tryAndIncrementEvm(message []byte, hashfunc func(message []byte) [32]byte, 
 	counter := []byte{byte(0)}
 	px = new(big.Int)
 	py = new(big.Int)
-	q := curve.getG1Q()
+	q := curve.GetG1Q()
 	for {
 		h := hashfunc(append(counter, message...))
 		counter[0]++
@@ -97,7 +97,7 @@ func fouqueTibouchiG1(curve CurveSystem, t *big.Int, blind bool) (Point1, bool) 
 func sw(curve CurveSystem, t *big.Int, blind bool) (Point1, bool) {
 	var x [3]*big.Int
 	b := curve.getG1B()
-	q := curve.getG1Q()
+	q := curve.GetG1Q()
 	qDiv2 := curve.getG1QDivTwo()
 	rootNeg3, neg1SubRootNeg3 := curve.getFTHashParams()
 
