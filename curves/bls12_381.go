@@ -65,6 +65,13 @@ func (pt *bls12Point1) Mul(scalar *big.Int) Point1 {
 	return prod
 }
 
+func (pt *bls12Point1) Negate() Point1 {
+	x, y := pt.ToAffineCoords()
+	y.Sub(bls12Q, y)
+	newPt, _ := Bls12.MakeG1Point(x, y, false)
+	return newPt
+}
+
 func (pt *bls12Point1) ToAffineCoords() (x, y *big.Int) {
 	pt.point.Normalize()
 	blsx, blsy, _ := pt.point.GetXYZ()
@@ -173,7 +180,7 @@ func (curve *bls12Curve) MakeG1Point(x, y *big.Int, check bool) (Point1, bool) {
 func (curve *bls12Curve) UnmarshalG1(data []byte) (Point1, bool) {
 	result := new(bls12.G1)
 	success := result.Unmarshal(data)
-	if success == nil {
+	if success == nil || !result.Check() {
 		return nil, false
 	}
 	return &bls12Point1{result}, true
@@ -182,7 +189,7 @@ func (curve *bls12Curve) UnmarshalG1(data []byte) (Point1, bool) {
 func (curve *bls12Curve) UnmarshalG2(data []byte) (Point2, bool) {
 	result := new(bls12.G2)
 	success := result.Unmarshal(data)
-	if success == nil {
+	if success == nil || !result.Check() {
 		return nil, false
 	}
 	return &bls12Point2{result}, true
@@ -221,10 +228,6 @@ func (curve *bls12Curve) GetG1Q() *big.Int {
 	return bls12Q
 }
 
-func (curve *bls12Curve) getG1QDivTwo() *big.Int {
-	return bls12QDiv2
-}
-
 func (curve *bls12Curve) getG1Cofactor() *big.Int {
 	return bls12Cofactor
 }
@@ -239,20 +242,19 @@ func (curve *bls12Curve) GetG1Order() *big.Int {
 }
 
 func (curve *bls12Curve) getFTHashParams() (*big.Int, *big.Int) {
-	return bls12SqrtNeg3, bls12Z
+	return bls12SwencSqrtNegThree, bls12SwencSqrtNegThreeMinusOneOverTwo
 }
 
 var bls12Q, _ = new(big.Int).SetString("0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab", 0)
-var bls12QDiv2 = new(big.Int).Div(bls12Q, two)
 var bls12X, _ = new(big.Int).SetString("-0xd201000000010000", 0)
 var bls12A, _ = new(big.Int).SetString("0", 10)
 var bls12B, _ = new(big.Int).SetString("4", 10)
 
-//precomputed Z = (-1 + sqrt(-3))/2 in Fq
-var bls12Z, _ = new(big.Int).SetString("793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620350", 10)
+//precomputed bls12SwencSqrtNegThreeMinusOneOverTwo = (-1 + sqrt(-3))/2 in Fq
+var bls12SwencSqrtNegThreeMinusOneOverTwo, _ = new(big.Int).SetString("793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620350", 10)
 
-//precomputed sqrt(-3) in Fq
-var bls12SqrtNeg3, _ = new(big.Int).SetString("1586958781458431025242759403266842894121773480562120986020912974854563298150952611241517463240701", 10)
+//precomputed bls12SwencSqrtNegThree in Fq
+var bls12SwencSqrtNegThree, _ = new(big.Int).SetString("1586958781458431025242759403266842894121773480562120986020912974854563298150952611241517463240701", 10)
 var bls12Cofactor, _ = new(big.Int).SetString("76329603384216526031706109802092473003", 10)
 var bls12Order, _ = new(big.Int).SetString("52435875175126190479447740508185965837690552500527637822603658699938581184513", 10)
 var bls12GT, _ = Bls12.GetG1().Pair(Bls12.GetG2())
