@@ -4,9 +4,15 @@
 package curves
 
 import (
+	"bufio"
 	"crypto/rand"
+	"io/ioutil"
 	"math/big"
+	"os"
+	"strings"
 	"testing"
+
+	b64 "encoding/base64"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -31,6 +37,13 @@ func TestMarshal(t *testing.T) {
 			} else {
 				t.Error("Unmarshalling G1 failed")
 			}
+			marshalled = mulg1.MarshalUncompressed()
+			if recoveredG1, ok := curve.UnmarshalG1(marshalled); ok {
+				assert.True(t, recoveredG1.Equals(mulg1),
+					"Unmarshalling G1 is not consistent with MarshalUncompressed G1")
+			} else {
+				t.Error("Unmarshalling G1 failed")
+			}
 			marshalled = marshalled[1:]
 			if _, ok := curve.UnmarshalG1(marshalled); ok {
 				t.Error("Unmarshalling G1 is succeeding when the byte array is of the wrong length")
@@ -44,6 +57,13 @@ func TestMarshal(t *testing.T) {
 			} else {
 				t.Error("Unmarshalling G2 failed on scalar " + scalar.String())
 			}
+			marshalled = mulg2.Marshal()
+			if recoveredG2, ok := curve.UnmarshalG2(marshalled); ok {
+				assert.True(t, recoveredG2.Equals(mulg2),
+					"Unmarshalling G2 is not consistent with MarshalUncompressed G2")
+			} else {
+				t.Error("Unmarshalling G2 failed on scalar " + scalar.String())
+			}
 			marshalled = marshalled[1:]
 			if _, ok := curve.UnmarshalG2(marshalled); ok {
 				t.Error("Unmarshalling G2 is succeeding when the byte array is of the wrong length")
@@ -51,10 +71,6 @@ func TestMarshal(t *testing.T) {
 
 			mulgT, _ := mulg1.Pair(curve.GetG2())
 			marshalled = mulgT.Marshal()
-			// fmt.Println("Coordinate wise representation of g1 * " + scalar.String() + " paired with g2")
-			// for i := 0; i < 12; i++ { // Code to print coordinates
-			// 	fmt.Println(marshalled[i*32 : (i+1)*32])
-			// }
 			if recoveredGT, ok := curve.UnmarshalGT(marshalled); ok {
 				assert.True(t, recoveredGT.Equals(mulgT),
 					"Unmarshalling GT is not consistent with Marshal GT")
@@ -67,4 +83,61 @@ func TestMarshal(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestG1HashVectors(t *testing.T) {
+	for _, curve := range curves {
+		// Says whether or not to generate test vectors
+		generate := false
+		if generate {
+			generateG1HashVectors(curve)
+		}
+		file, err := os.Open("testcases/" + curve.Name() + "G1Hash.txt")
+		if err != nil {
+			t.Error(err)
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := scanner.Text()
+			s := strings.Split(line, ",")
+			msg, err1 := b64.StdEncoding.DecodeString(s[0])
+			marshalledPt, err2 := b64.StdEncoding.DecodeString(s[1])
+			if err1 != nil || err2 != nil {
+				t.Error("Incorrectly formatted test vector file " + err.Error())
+			}
+			chkPt := curve.HashToG1(msg)
+			pt, ok := curve.UnmarshalG1(marshalledPt)
+			if !ok {
+				t.Error("Error in unmarshalling point")
+			}
+			assert.True(t, pt.Equals(chkPt))
+		}
+
+		if err := scanner.Err(); err != nil {
+			t.Error(err)
+		}
+	}
+}
+
+func generateG1HashVectors(curve CurveSystem) {
+	N := 10
+	msgSize := 64
+	output := make([]byte, 0, N*(msgSize+96))
+	for i := 0; i < N; i++ {
+		msg := make([]byte, msgSize)
+		_, _ = rand.Read(msg)
+		pt := curve.HashToG1(msg)
+		mutativeAppend(&output, []byte(b64.StdEncoding.EncodeToString(msg)))
+		mutativeAppend(&output, []byte(","))
+		mutativeAppend(&output, []byte(b64.StdEncoding.EncodeToString(pt.MarshalUncompressed())))
+		mutativeAppend(&output, []byte("\n"))
+	}
+	os.Remove("testcases/" + curve.Name() + "G1Hash.txt")
+	ioutil.WriteFile("testcases/"+curve.Name()+"G1Hash.txt", output, 0644)
+}
+
+func mutativeAppend(s *[]byte, msg []byte) {
+	*s = append(*s, msg...)
 }

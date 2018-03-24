@@ -32,6 +32,11 @@ type altbn128PointT struct {
 // Altbn128Inst is the instance for the altbn128 curve, with all of its functions.
 var Altbn128 = &altbn128{}
 
+// Returns the name of the curve
+func (curve *altbn128) Name() string {
+	return "altbn128"
+}
+
 // MakeG1Point copies points into []byte and unmarshals to get around curvePoint not being exported
 // Note that check does nothing here, because the upstream library checks that the point is on the curve.
 func (curve *altbn128) MakeG1Point(x, y *big.Int, check bool) (Point1, bool) {

@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"github.com/dchest/blake2b"
+	// Code being used is the fork from Project-Arda/bls12
 	"github.com/dis2/bls12"
 )
 
@@ -61,6 +62,10 @@ func (pt *bls12Point1) MarshalUncompressed() []byte {
 
 func (pt *bls12Point1) Mul(scalar *big.Int) Point1 {
 	prod, _ := pt.Copy().(*bls12Point1)
+	if scalar.Cmp(zero) < 0 {
+		prod.Negate()
+		scalar.Mul(scalar, big.NewInt(-1))
+	}
 	prod.point.ScalarMult(new(bls12.Scalar).FromInt(scalar))
 	return prod
 }
@@ -166,6 +171,10 @@ func (pt bls12PointT) Mul(scalar *big.Int) PointT {
 	prod, _ := pt.Copy().(bls12PointT)
 	prod.point.ScalarMult(new(bls12.Scalar).FromInt(scalar))
 	return prod
+}
+
+func (curve *bls12Curve) Name() string {
+	return "bls12"
 }
 
 func (curve *bls12Curve) MakeG1Point(x, y *big.Int, check bool) (Point1, bool) {
