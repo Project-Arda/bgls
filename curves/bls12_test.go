@@ -51,3 +51,16 @@ func TestG1SwEncodeDegenerate(test *testing.T) {
 	chkInfty, _ = g1.Add(negG1)
 	assert.True(test, chkInfty.Equals(infty), "Point at infinity isn't being returned under addition")
 }
+
+// taken from https://github.com/ebfull/pairing/pull/30/commits/092a0f2846ca9e1a18eef849355e847f61eaf2bc
+func TestKnownBls12G1Hashes(t *testing.T) {
+	msg := []byte{}
+	p := Bls12.HashToG1(msg)
+	x, _ := new(big.Int).SetString("315124130825307604287835216317628428134609737854237653839182597515996444073032649481416725367158979153513345579672", 10)
+	y, _ := new(big.Int).SetString("3093537746211397858160667262592024570071165158580434464756577567510401504168962073691924150397172185836012224315174", 10)
+	q, ok := Bls12.MakeG1Point(x, y, true)
+	if !ok {
+		t.Error("known point not registering as on the curve")
+	}
+	assert.True(t, p.Equals(q))
+}

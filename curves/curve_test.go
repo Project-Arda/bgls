@@ -88,11 +88,11 @@ func TestMarshal(t *testing.T) {
 func TestG1HashVectors(t *testing.T) {
 	for _, curve := range curves {
 		// Says whether or not to generate test vectors
-		generate := false
+		generate := true
 		if generate {
 			generateG1HashVectors(curve)
 		}
-		file, err := os.Open("testcases/" + curve.Name() + "G1Hash.txt")
+		file, err := os.Open("testcases/" + curve.Name() + "G1Hash.dat")
 		if err != nil {
 			t.Error(err)
 		}
@@ -134,8 +134,8 @@ func generateG1HashVectors(curve CurveSystem) {
 		mutativeAppend(&output, []byte(b64.StdEncoding.EncodeToString(pt.MarshalUncompressed())))
 		mutativeAppend(&output, []byte("\n"))
 	}
-	os.Remove("testcases/" + curve.Name() + "G1Hash.txt")
-	ioutil.WriteFile("testcases/"+curve.Name()+"G1Hash.txt", output, 0644)
+	os.Remove("testcases/" + curve.Name() + "G1Hash.dat")
+	ioutil.WriteFile("testcases/"+curve.Name()+"G1Hash.dat", output, 0644)
 }
 
 func mutativeAppend(s *[]byte, msg []byte) {

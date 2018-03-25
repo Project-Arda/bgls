@@ -267,8 +267,8 @@ var bls12SwencSqrtNegThree, _ = new(big.Int).SetString("158695878145843102524275
 var bls12Cofactor, _ = new(big.Int).SetString("76329603384216526031706109802092473003", 10)
 var bls12Order, _ = new(big.Int).SetString("52435875175126190479447740508185965837690552500527637822603658699938581184513", 10)
 var bls12GT, _ = Bls12.GetG1().Pair(Bls12.GetG2())
-var bls12G1Tag1 = []byte("\x00G1_x")
-var bls12G1Tag2 = []byte("\xffG1_x")
+var bls12G1Tag1 = []byte("G1_0")
+var bls12G1Tag2 = []byte("G1_1")
 
 var bls12FTRoot1, _ = new(big.Int).SetString("248294325734266649657405162895821171812231848760181225578082735178502750823719347628762635478508544819911854747095", 10)
 var bls12FTRoot2, _ = new(big.Int).SetString("3754115229487400743760384662840082984744650971178826659753975400945528899667118516813924993650507119217982417812692", 10)
@@ -287,13 +287,14 @@ func (curve *bls12Curve) HashToG1Blind(message []byte) Point1 {
 // This hashes a given message to G1, and the second parameter specifies whether
 // or not to blind the computation, to prevent timing information from being leaked.
 func hashToG1BlindingAbstracted(message []byte, blind bool) Point1 {
-	t1Bytes := bls12G1pt1blake2b(message)
+	t1Bytes := bls12Blake2b(message, bls12G1Tag1)
 	pt1 := bls12FouqueTibouchi(t1Bytes, blind)
-	t2Bytes := bls12G1pt2blake2b(message)
+	t2Bytes := bls12Blake2b(message, bls12G1Tag2)
 	pt2 := bls12FouqueTibouchi(t2Bytes, blind)
 
 	pt1, _ = pt1.Add(pt2)
-	pt1 = pt1.Mul(bls12Cofactor)
+	// Underlying library does cofactor multiplication implicitly
+	// pt1 = pt1.Mul(bls12Cofactor)
 	return pt1
 }
 
@@ -323,15 +324,6 @@ func bls12FouqueTibouchi(tBytes [64]byte, blind bool) Point1 {
 // https://github.com/ebfull/pairing/pull/30
 // A null byte is appended to the message (done inside of the tag), in
 // accordance with what the rust code is currently doing.
-func bls12G1pt1blake2b(message []byte) [64]byte {
-	return blake2b.Sum512(append(message, bls12G1Tag1...))
-}
-
-// bls12G1pt2blake2b returns Blake2b(message || \xff || Tag)
-// This is done in correspondence to the current conversation going on at
-// https://github.com/ebfull/pairing/pull/30
-// A null byte is appended to the message (done inside of the tag), in
-// accordance with what the rust code is currently doing.
-func bls12G1pt2blake2b(message []byte) [64]byte {
-	return blake2b.Sum512(append(message, bls12G1Tag2...))
+func bls12Blake2b(message []byte, tag []byte) [64]byte {
+	return blake2b.Sum512(append(message, tag...))
 }
