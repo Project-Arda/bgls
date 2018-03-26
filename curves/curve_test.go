@@ -88,7 +88,7 @@ func TestMarshal(t *testing.T) {
 func TestG1HashVectors(t *testing.T) {
 	for _, curve := range curves {
 		// Says whether or not to generate test vectors
-		generate := true
+		generate := false
 		if generate {
 			generateG1HashVectors(curve)
 		}
@@ -122,22 +122,27 @@ func TestG1HashVectors(t *testing.T) {
 }
 
 func generateG1HashVectors(curve CurveSystem) {
-	N := 10
+	NumberOfTests := 10
 	msgSize := 64
-	output := make([]byte, 0, N*(msgSize+96))
-	for i := 0; i < N; i++ {
+	output := make([]byte, 0, NumberOfTests*(msgSize+96))
+	for i := 0; i < NumberOfTests; i++ {
 		msg := make([]byte, msgSize)
 		_, _ = rand.Read(msg)
 		pt := curve.HashToG1(msg)
+		// Make the created format for these:
+		// base64(msg),base64(Uncompressed Marshal of HashToG1(msg))
+		// Note that there is no space between the two base64'd messages.
 		mutativeAppend(&output, []byte(b64.StdEncoding.EncodeToString(msg)))
 		mutativeAppend(&output, []byte(","))
 		mutativeAppend(&output, []byte(b64.StdEncoding.EncodeToString(pt.MarshalUncompressed())))
 		mutativeAppend(&output, []byte("\n"))
 	}
+	// Delete old file it exists
 	os.Remove("testcases/" + curve.Name() + "G1Hash.dat")
 	ioutil.WriteFile("testcases/"+curve.Name()+"G1Hash.dat", output, 0644)
 }
 
+// Mutatively appends msg to s. This is used to avoid having to reallocate more memory for s.
 func mutativeAppend(s *[]byte, msg []byte) {
 	*s = append(*s, msg...)
 }

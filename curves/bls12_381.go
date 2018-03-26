@@ -7,7 +7,6 @@ import (
 	"math/big"
 
 	"github.com/dchest/blake2b"
-	// Code being used is the fork from Project-Arda/bls12
 	"github.com/dis2/bls12"
 )
 
@@ -78,6 +77,7 @@ func (pt *bls12Point1) Negate() Point1 {
 }
 
 func (pt *bls12Point1) ToAffineCoords() (x, y *big.Int) {
+	// Upstream library uses projective space
 	pt.point.Normalize()
 	blsx, blsy, _ := pt.point.GetXYZ()
 	return blsx.ToInt()[0], blsy.ToInt()[0]
@@ -187,6 +187,9 @@ func (curve *bls12Curve) MakeG1Point(x, y *big.Int, check bool) (Point1, bool) {
 }
 
 func (curve *bls12Curve) UnmarshalG1(data []byte) (Point1, bool) {
+	if len(data) != 48 && len(data) != 96 {
+		return nil, false
+	}
 	result := new(bls12.G1)
 	success := result.Unmarshal(data)
 	if success == nil || !result.Check() {
@@ -196,6 +199,9 @@ func (curve *bls12Curve) UnmarshalG1(data []byte) (Point1, bool) {
 }
 
 func (curve *bls12Curve) UnmarshalG2(data []byte) (Point2, bool) {
+	if len(data) != 96 && len(data) != 192 {
+		return nil, false
+	}
 	result := new(bls12.G2)
 	success := result.Unmarshal(data)
 	if success == nil || !result.Check() {
@@ -301,13 +307,13 @@ func hashToG1BlindingAbstracted(message []byte, blind bool) Point1 {
 func bls12FouqueTibouchi(tBytes [64]byte, blind bool) Point1 {
 	t := new(big.Int).SetBytes(tBytes[:])
 	t.Mod(t, bls12Q)
-	// Explicitly handle undefined t
-	if t.Cmp(zero) == 0 {
+	// Explicitly handle degenerate cases for t
+	if t.Cmp(zero) == 0 { // Hash(0) = infty
 		pt, _ := Bls12.MakeG1Point(zero, zero, false)
 		return pt
-	} else if t.Cmp(bls12FTRoot1) == 0 {
+	} else if t.Cmp(bls12FTRoot1) == 0 { // encode(sqrt(-5)) = -g1
 		return Bls12.GetG1()
-	} else if t.Cmp(bls12FTRoot2) == 0 {
+	} else if t.Cmp(bls12FTRoot2) == 0 { // encode(-sqrt(-5)) = g1
 		pt := new(bls12.G1)
 		g1x, g1y := Bls12.GetG1().ToAffineCoords()
 		g1y.Sub(bls12Q, g1y)
@@ -319,11 +325,8 @@ func bls12FouqueTibouchi(tBytes [64]byte, blind bool) Point1 {
 	return pt
 }
 
-// bls12G1pt1blake2b returns Blake2b(message || \x00 || Tag)
-// This is done in correspondence to the current conversation going on at
-// https://github.com/ebfull/pairing/pull/30
-// A null byte is appended to the message (done inside of the tag), in
-// accordance with what the rust code is currently doing.
+// bls12Blake2b returns Blake2b(message || Tag)
+// The tags with what is being used in https://github.com/ebfull/pairing/pull/30
 func bls12Blake2b(message []byte, tag []byte) [64]byte {
 	return blake2b.Sum512(append(message, tag...))
 }

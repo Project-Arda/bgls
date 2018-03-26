@@ -24,32 +24,36 @@ func TestG1BlindingMatches(t *testing.T) {
 	}
 }
 
-func TestG1SwEncodeDegenerate(test *testing.T) {
+func TestG1SwEncodeDegenerate(t *testing.T) {
+	// Check that bls12FouqueTibouchi([0]) = point at infinity
 	infty, _ := Bls12.MakeG1Point(zero, zero, false)
 	var zeroArr [64]byte
 	chkInfty := bls12FouqueTibouchi(zeroArr, false)
-	assert.True(test, chkInfty.Equals(infty), "Degenerate case for t=0 did not return the point at infinity.")
+	assert.True(t, chkInfty.Equals(infty), "Degenerate case for t=0 did not return the point at infinity.")
 
+	// Check that bls12FouqueTibouchi([-sqrt(5)]) = +-g1
+	// The plus or minus for g1 must be set such that it matches the input.
 	g1 := Bls12.GetG1()
 	negG1 := g1.(*bls12Point1).Negate()
-	t := new(big.Int).Sub(bls12Q, big.NewInt(5))
-	t = calcQuadRes(t, bls12Q)
+	sqrtNeg5 := new(big.Int).Sub(bls12Q, big.NewInt(5))
+	sqrtNeg5 = calcQuadRes(sqrtNeg5, bls12Q)
 	var tArr [64]byte
-	tBytes := t.Bytes()
+	tBytes := sqrtNeg5.Bytes()
 	copy(tArr[64-len(tBytes):], tBytes)
 	chkNegG1 := bls12FouqueTibouchi(tArr, false)
 	_, y := chkNegG1.ToAffineCoords()
-	assert.True(test, parity(y, bls12Q) == parity(t, bls12Q), "Parity for t=sqrt(-5) doesn't match return value")
-	assert.True(test, chkNegG1.Equals(negG1), "Degenerate case for t=sqrt(-5) did not return g1.")
-	t.Sub(bls12Q, t)
-	tBytes = t.Bytes()
+	assert.True(t, parity(y, bls12Q) == parity(sqrtNeg5, bls12Q), "Parity for t=sqrt(-5) doesn't match return value")
+	assert.True(t, chkNegG1.Equals(negG1), "Degenerate case for t=sqrt(-5) did not return g1.")
+	// Invert the parity of sqrtNeg5, and check the other side
+	sqrtNeg5.Sub(bls12Q, sqrtNeg5)
+	tBytes = sqrtNeg5.Bytes()
 	copy(tArr[64-len(tBytes):], tBytes)
 	chkG1 := bls12FouqueTibouchi(tArr, false)
 	_, y = chkG1.ToAffineCoords()
-	assert.True(test, parity(y, bls12Q) == parity(t, bls12Q), "Parity for t=-sqrt(-5) doesn't match return value")
-	assert.True(test, chkG1.Equals(g1), "Degenerate case for t=-sqrt(-5) did not return g1.")
+	assert.True(t, parity(y, bls12Q) == parity(sqrtNeg5, bls12Q), "Parity for t=-sqrt(-5) doesn't match return value")
+	assert.True(t, chkG1.Equals(g1), "Degenerate case for t=-sqrt(-5) did not return g1.")
 	chkInfty, _ = g1.Add(negG1)
-	assert.True(test, chkInfty.Equals(infty), "Point at infinity isn't being returned under addition")
+	assert.True(t, chkInfty.Equals(infty), "Point at infinity isn't being returned under addition")
 }
 
 // taken from https://github.com/ebfull/pairing/pull/30/commits/092a0f2846ca9e1a18eef849355e847f61eaf2bc
