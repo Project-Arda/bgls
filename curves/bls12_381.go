@@ -6,8 +6,8 @@ package curves
 import (
 	"math/big"
 
-	"github.com/dchest/blake2b"
 	"github.com/dis2/bls12"
+	"golang.org/x/crypto/blake2b"
 )
 
 type bls12Curve struct {
@@ -61,9 +61,12 @@ func (pt *bls12Point1) MarshalUncompressed() []byte {
 
 func (pt *bls12Point1) Mul(scalar *big.Int) Point1 {
 	prod, _ := pt.Copy().(*bls12Point1)
-	if scalar.Cmp(zero) < 0 {
-		prod.Negate()
+	cmp := scalar.Cmp(zero)
+	if cmp < 0 {
+		prod = prod.Negate().(*bls12Point1)
 		scalar.Mul(scalar, big.NewInt(-1))
+	} else if cmp == 0 {
+		return Bls12.GetG1Infinity()
 	}
 	prod.point.ScalarMult(new(bls12.Scalar).FromInt(scalar))
 	return prod
@@ -124,6 +127,9 @@ func (pt *bls12Point2) MarshalUncompressed() []byte {
 }
 
 func (pt *bls12Point2) Mul(scalar *big.Int) Point2 {
+	if scalar.Cmp(zero) == 0 {
+		return Bls12.GetG2Infinity()
+	}
 	prod, _ := pt.Copy().(*bls12Point2)
 	prod.point.ScalarMult(new(bls12.Scalar).FromInt(scalar))
 	return prod
@@ -229,6 +235,14 @@ func (curve *bls12Curve) GetG2() Point2 {
 
 func (curve *bls12Curve) GetGT() PointT {
 	return bls12GT
+}
+
+func (curve *bls12Curve) GetG1Infinity() Point1 {
+	return &bls12Point1{bls12.G1Zero()}
+}
+
+func (curve *bls12Curve) GetG2Infinity() Point2 {
+	return &bls12Point2{bls12.G2Zero()}
 }
 
 func (curve *bls12Curve) getG1A() *big.Int {

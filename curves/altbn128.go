@@ -102,9 +102,23 @@ func pad32Bytes(xBytes []byte) []byte {
 }
 
 func (g1Point *altbn128Point1) Mul(scalar *big.Int) Point1 {
+	cmp := scalar.Cmp(zero)
+	if cmp < 0 {
+		g1Point = g1Point.Negate().(*altbn128Point1)
+		scalar.Mul(scalar, big.NewInt(-1))
+	} else if cmp == 0 {
+		return Altbn128.GetG1Infinity()
+	}
 	prod := new(bn256.G1).ScalarMult(g1Point.point, scalar)
 	ret := &altbn128Point1{prod}
 	return ret
+}
+
+func (g1Point *altbn128Point1) Negate() Point1 {
+	x, y := g1Point.ToAffineCoords()
+	y.Sub(altbnG1Q, y)
+	newPt, _ := Altbn128.MakeG1Point(x, y, false)
+	return newPt
 }
 
 func (g1Point *altbn128Point1) Pair(g2Point Point2) (PointT, bool) {
@@ -372,6 +386,15 @@ func (curve *altbn128) GetG1() Point1 {
 
 func (curve *altbn128) GetG2() Point2 {
 	return altbnG2
+}
+
+func (curve *altbn128) GetG1Infinity() (pt Point1) {
+	pt, _ = curve.MakeG1Point(zero, zero, false)
+	return
+}
+
+func (curve *altbn128) GetG2Infinity() Point2 {
+	return curve.GetG2().Mul(new(big.Int).SetInt64(0))
 }
 
 func (curve *altbn128) GetGT() PointT {

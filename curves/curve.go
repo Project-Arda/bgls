@@ -27,6 +27,9 @@ type CurveSystem interface {
 	GetG2() Point2
 	GetGT() PointT
 
+	GetG1Infinity() Point1
+	GetG2Infinity() Point2
+
 	HashToG1(message []byte) Point1
 
 	GetG1Q() *big.Int
@@ -50,6 +53,7 @@ type Point1 interface {
 	Marshal() []byte
 	MarshalUncompressed() []byte
 	Mul(*big.Int) Point1
+	Negate() Point1
 	Pair(Point2) (PointT, bool)
 	ToAffineCoords() (*big.Int, *big.Int)
 }

@@ -85,6 +85,24 @@ func TestMarshal(t *testing.T) {
 	}
 }
 
+func TestMul(t *testing.T) {
+	for _, curve := range curves {
+		numTests := 32
+		requiredScalars := []*big.Int{zero, one}
+		for i := 0; i < numTests; i++ {
+			scalar, _ := rand.Int(rand.Reader, curve.GetG1Order())
+			if i < len(requiredScalars) {
+				scalar = requiredScalars[i]
+			}
+			scalarNeg := new(big.Int).Sub(zero, scalar)
+			pt1 := curve.GetG1().Mul(scalar)
+			pt2 := curve.GetG1().Mul(scalarNeg)
+			inf, _ := pt1.Add(pt2)
+			assert.True(t, inf.Equals(curve.GetG1Infinity()))
+		}
+	}
+}
+
 func TestG1HashVectors(t *testing.T) {
 	for _, curve := range curves {
 		// Says whether or not to generate test vectors
