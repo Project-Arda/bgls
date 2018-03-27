@@ -6,6 +6,7 @@ package bgls
 import (
 	"crypto/rand"
 	"math/big"
+	mathrand "math/rand"
 	"testing"
 
 	. "github.com/Project-Arda/bgls/curves"
@@ -98,6 +99,36 @@ func TestMultiSig(t *testing.T) {
 			_, vkf, _ := KeyGen(curve)
 			signers[0] = vkf
 			assert.False(t, VerifyMultiSignature(curve, aggSig, signers, msg),
+				"Aggregate MultiSig verification succeeded on incorrect signers")
+		}
+	}
+}
+
+func TestMultiSigWithMultiplicity(t *testing.T) {
+	for _, curve := range curves[:1] { //TODO add back in testing bls12 once G2.Mul(0) gives identity, or there is a better way to get identity
+		Tests, Size, Signers := 5, 32, 10
+		for i := 0; i < Tests; i++ {
+			msg := make([]byte, Size)
+			rand.Read(msg)
+			signers := make([]Point2, Signers)
+			sigs := make([]Point1, Signers)
+			multi := make([]int64, Signers)
+			for j := 0; j < Signers; j++ {
+				sk, vk, _ := KeyGen(curve)
+				multi[j] = mathrand.Int63()
+				sigs[j] = Sign(curve, sk, msg).Mul(big.NewInt(multi[j]))
+				signers[j] = vk
+			}
+			aggSig := AggregateG1(sigs)
+			assert.True(t, VerifyMultiSignatureWithMultiplicity(curve, aggSig, signers, multi, msg),
+				"Aggregate MultiSig verification failed")
+			msg2 := make([]byte, Size)
+			rand.Read(msg2)
+			assert.False(t, VerifyMultiSignatureWithMultiplicity(curve, aggSig, signers, multi, msg2),
+				"Aggregate MultiSig verification succeeded on incorrect msg")
+			_, vkf, _ := KeyGen(curve)
+			signers[0] = vkf
+			assert.False(t, VerifyMultiSignatureWithMultiplicity(curve, aggSig, signers, multi, msg),
 				"Aggregate MultiSig verification succeeded on incorrect signers")
 		}
 	}
