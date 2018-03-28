@@ -27,7 +27,7 @@ func TestG1BlindingMatches(t *testing.T) {
 func TestG1SwEncodeDegenerate(t *testing.T) {
 	// Check that bls12FouqueTibouchi([0]) = point at infinity
 	infty, _ := Bls12.MakeG1Point(zero, zero, false)
-	var zeroArr [64]byte
+	var zeroArr []byte
 	chkInfty := bls12FouqueTibouchi(zeroArr, false)
 	assert.True(t, chkInfty.Equals(infty), "Degenerate case for t=0 did not return the point at infinity.")
 
@@ -37,18 +37,15 @@ func TestG1SwEncodeDegenerate(t *testing.T) {
 	negG1 := g1.(*bls12Point1).Negate()
 	sqrtNeg5 := new(big.Int).Sub(bls12Q, big.NewInt(5))
 	sqrtNeg5 = calcQuadRes(sqrtNeg5, bls12Q)
-	var tArr [64]byte
 	tBytes := sqrtNeg5.Bytes()
-	copy(tArr[64-len(tBytes):], tBytes)
-	chkNegG1 := bls12FouqueTibouchi(tArr, false)
+	chkNegG1 := bls12FouqueTibouchi(tBytes, false)
 	_, y := chkNegG1.ToAffineCoords()
 	assert.True(t, parity(y, bls12Q) == parity(sqrtNeg5, bls12Q), "Parity for t=sqrt(-5) doesn't match return value")
 	assert.True(t, chkNegG1.Equals(negG1), "Degenerate case for t=sqrt(-5) did not return g1.")
 	// Invert the parity of sqrtNeg5, and check the other side
 	sqrtNeg5.Sub(bls12Q, sqrtNeg5)
 	tBytes = sqrtNeg5.Bytes()
-	copy(tArr[64-len(tBytes):], tBytes)
-	chkG1 := bls12FouqueTibouchi(tArr, false)
+	chkG1 := bls12FouqueTibouchi(tBytes, false)
 	_, y = chkG1.ToAffineCoords()
 	assert.True(t, parity(y, bls12Q) == parity(sqrtNeg5, bls12Q), "Parity for t=-sqrt(-5) doesn't match return value")
 	assert.True(t, chkG1.Equals(g1), "Degenerate case for t=-sqrt(-5) did not return g1.")

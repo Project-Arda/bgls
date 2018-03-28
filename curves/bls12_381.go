@@ -4,10 +4,11 @@
 package curves
 
 import (
+	"hash"
 	"math/big"
 
+	"github.com/ValarDragon/crypto/blake2b"
 	"github.com/dis2/bls12"
-	"golang.org/x/crypto/blake2b"
 )
 
 type bls12Curve struct {
@@ -307,9 +308,12 @@ func (curve *bls12Curve) HashToG1Blind(message []byte) Point1 {
 // This hashes a given message to G1, and the second parameter specifies whether
 // or not to blind the computation, to prevent timing information from being leaked.
 func hashToG1BlindingAbstracted(message []byte, blind bool) Point1 {
-	t1Bytes := bls12Blake2b(message, bls12G1Tag1)
+	b2, _ := blake2b.New512(nil)
+	b2.Write(message)
+	b2Copy, _ := blake2b.Clone(b2)
+	t1Bytes := bls12Blake2b(b2, bls12G1Tag1)
 	pt1 := bls12FouqueTibouchi(t1Bytes, blind)
-	t2Bytes := bls12Blake2b(message, bls12G1Tag2)
+	t2Bytes := bls12Blake2b(b2Copy, bls12G1Tag2)
 	pt2 := bls12FouqueTibouchi(t2Bytes, blind)
 
 	pt1, _ = pt1.Add(pt2)
@@ -318,8 +322,8 @@ func hashToG1BlindingAbstracted(message []byte, blind bool) Point1 {
 	return pt1
 }
 
-func bls12FouqueTibouchi(tBytes [64]byte, blind bool) Point1 {
-	t := new(big.Int).SetBytes(tBytes[:])
+func bls12FouqueTibouchi(tBytes []byte, blind bool) Point1 {
+	t := new(big.Int).SetBytes(tBytes)
 	t.Mod(t, bls12Q)
 	// Explicitly handle degenerate cases for t
 	if t.Cmp(zero) == 0 { // Hash(0) = infty
@@ -341,6 +345,7 @@ func bls12FouqueTibouchi(tBytes [64]byte, blind bool) Point1 {
 
 // bls12Blake2b returns Blake2b(message || Tag)
 // The tags with what is being used in https://github.com/ebfull/pairing/pull/30
-func bls12Blake2b(message []byte, tag []byte) [64]byte {
-	return blake2b.Sum512(append(message, tag...))
+func bls12Blake2b(blake2b hash.Hash, tag []byte) []byte {
+	blake2b.Write(tag)
+	return blake2b.Sum([]byte{})
 }
