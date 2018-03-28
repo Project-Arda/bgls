@@ -40,30 +40,6 @@ func LoadPublicKey(curve CurveSystem, sk *big.Int) Point2 {
 	return pubKey
 }
 
-// Authenticate generates an Authentication for a valid *big.Int/Point2 combo
-// It signs a verification key with x.
-func Authenticate(curve CurveSystem, sk *big.Int) Point1 {
-	return AuthenticateCustHash(curve, sk, curve.HashToG1)
-}
-
-// AuthenticateCustHash generates an Authentication for a valid *big.Int/Point2 combo
-// It signs a verification key with x. This runs with the specified hash function.
-func AuthenticateCustHash(curve CurveSystem, sk *big.Int, hash func([]byte) Point1) Point1 {
-	m := LoadPublicKey(curve, sk).Marshal()
-	return SignCustHash(sk, m, hash)
-}
-
-//CheckAuthentication verifies that this Point2 is valid
-func CheckAuthentication(curve CurveSystem, v Point2, authentication Point1) bool {
-	return CheckAuthenticationCustHash(curve, v, authentication, curve.HashToG1)
-}
-
-//CheckAuthenticationCustHash verifies that this Point2 is valid, with the specified hash function
-func CheckAuthenticationCustHash(curve CurveSystem, v Point2, authentication Point1, hash func([]byte) Point1) bool {
-	m := v.Marshal()
-	return VerifyCustHash(curve, v, m, authentication, hash)
-}
-
 //Sign creates a signature on a message with a private key
 func Sign(curve CurveSystem, sk *big.Int, m []byte) Point1 {
 	return SignCustHash(sk, m, curve.HashToG1)
@@ -95,21 +71,26 @@ func VerifyCustHash(curve CurveSystem, pubKey Point2, m []byte, sig Point1, hash
 
 // AggregateG1 takes the sum of points on G1. This is used to convert a set of signatures into a single signature
 func AggregateG1(sigs []Point1) Point1 {
-	c := make(chan Point1)
-	if len(sigs) == 2 {
+	if len(sigs) == 2 { // No parallelization needed
 		aggG1, _ := sigs[0].Add(sigs[1])
 		return aggG1
 	}
+	// Aggregate all the g1 signatures together using concurrency
+	c := make(chan Point1)
 	aggSigs := make([]Point1, (len(sigs)/2)+(len(sigs)%2))
 	counter := 0
-	for i := 0; i < len(sigs); i += 2 { // No parallelization needed
-		go concurrentAggregateG1(i, i+2, sigs, c)
+
+	// Initialize aggsigs to an array with signatures being the sum of two
+	// adjacent signatures.
+	for i := 0; i < len(sigs); i += 2 {
+		go concurrentAggregateG1(i, sigs, c)
 		counter++
 	}
 	for i := 0; i < counter; i++ {
 		aggSigs[i] = <-c
 	}
 
+	// Keep on aggregating every pair of signatures until only one signature remains
 	for {
 		nxtAggSigs := make([]Point1, (len(aggSigs)/2)+(len(aggSigs)%2))
 		counter = 0
@@ -117,7 +98,7 @@ func AggregateG1(sigs []Point1) Point1 {
 			break
 		}
 		for i := 0; i < len(aggSigs); i += 2 {
-			go concurrentAggregateG1(i, i+2, aggSigs, c)
+			go concurrentAggregateG1(i, aggSigs, c)
 			counter++
 		}
 		for i := 0; i < counter; i++ {
@@ -128,32 +109,39 @@ func AggregateG1(sigs []Point1) Point1 {
 	return aggSigs[0]
 }
 
-func concurrentAggregateG1(start int, end int, sigs []Point1, c chan Point1) {
-	if end > len(sigs) {
+// concurrentAggregateG1 handles the channel for concurrent Aggregation of g1 points.
+// It only adds the element at keys[start] and keys[start + 1], and sends it through the channel
+func concurrentAggregateG1(start int, sigs []Point1, c chan Point1) {
+	if start+1 >= len(sigs) {
 		c <- sigs[start]
 		return
 	}
-	summed, _ := sigs[start].Add(sigs[end-1])
+	summed, _ := sigs[start].Add(sigs[start+1])
 	c <- summed
 }
 
 // AggregateG2 takes the sum of points on G2. This is used to sum a set of public keys for the multisignature
 func AggregateG2(keys []Point2) Point2 {
-	c := make(chan Point2)
 	if len(keys) == 2 { // No parallelization needed
 		aggG2, _ := keys[0].Add(keys[1])
 		return aggG2
 	}
+	// Aggregate all the g2 points together using concurrency
+	c := make(chan Point2)
 	aggKeys := make([]Point2, (len(keys)/2)+(len(keys)%2))
 	counter := 0
+
+	// Initialize aggKeys to an array with elements being the sum of two
+	// adjacent Point 2's.
 	for i := 0; i < len(keys); i += 2 {
-		go concurrentAggregateG2(i, i+2, keys, c)
+		go concurrentAggregateG2(i, keys, c)
 		counter++
 	}
 	for i := 0; i < counter; i++ {
 		aggKeys[i] = <-c
 	}
 
+	// Keep on aggregating every pair of keys until only one aggregate key remains
 	for {
 		nxtAggKeys := make([]Point2, (len(aggKeys)/2)+(len(aggKeys)%2))
 		counter = 0
@@ -161,7 +149,7 @@ func AggregateG2(keys []Point2) Point2 {
 			break
 		}
 		for i := 0; i < len(aggKeys); i += 2 {
-			go concurrentAggregateG2(i, i+2, aggKeys, c)
+			go concurrentAggregateG2(i, aggKeys, c)
 			counter++
 		}
 		for i := 0; i < counter; i++ {
@@ -172,24 +160,31 @@ func AggregateG2(keys []Point2) Point2 {
 	return aggKeys[0]
 }
 
-func concurrentAggregateG2(start int, end int, keys []Point2, c chan Point2) {
-	if end > len(keys) {
+// concurrentAggregateG2 handles the channel for concurrent Aggregation of g2 points.
+// It only adds the element at keys[start] and keys[start + 1], and sends it through the channel
+func concurrentAggregateG2(start int, keys []Point2, c chan Point2) {
+	if start+1 >= len(keys) {
 		c <- keys[start]
 		return
 	}
-	summed, _ := keys[start].Add(keys[end-1])
+	summed, _ := keys[start].Add(keys[start+1])
 	c <- summed
 }
 
-// Verify checks that all messages were signed by associated keys
-// Will fail under duplicate messages
-func (a AggSig) Verify(curve CurveSystem) bool {
-	return VerifyAggregateSignature(curve, a.sig, a.keys, a.msgs, false)
+func (a *AggSig) Verify(curve CurveSystem) bool {
+	return VerifyAggregateSignature(curve, a.sig, a.keys, a.msgs)
 }
 
 // VerifyAggregateSignature verifies that the aggregated signature proves that all messages were signed by associated keys
-// Will fail under duplicate messages, unless allow duplicates is True.
-func VerifyAggregateSignature(curve CurveSystem, aggsig Point1, keys []Point2, msgs [][]byte, allowDuplicates bool) bool {
+// Will fail if there are duplicate messages, due to the possibility of the rogue public-key attack.
+// If duplicate messages should be allowed, one of the protections against the rogue public-key attack should be used
+// such as Knowledge of Secret Key (Kosk), enforcing distinct messages, or the method discussed
+// here <https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html>
+func VerifyAggregateSignature(curve CurveSystem, aggsig Point1, keys []Point2, msgs [][]byte) bool {
+	return verifyAggSig(curve, aggsig, keys, msgs, false)
+}
+
+func verifyAggSig(curve CurveSystem, aggsig Point1, keys []Point2, msgs [][]byte, allowDuplicates bool) bool {
 	if len(keys) != len(msgs) {
 		return false
 	}
@@ -213,33 +208,16 @@ func VerifyAggregateSignature(curve CurveSystem, aggsig Point1, keys []Point2, m
 	return e1.Equals(e2)
 }
 
+// concurrentPair pairs pt with key, and sends the result down the channel.
 func concurrentPair(curve CurveSystem, pt Point1, key Point2, c chan PointT) {
 	targetPoint, _ := pt.Pair(key)
 	c <- targetPoint
 }
 
+// concurrentMsgPair hashes the message, pairs it with key, and sends the result down the channel.
 func concurrentMsgPair(curve CurveSystem, msg []byte, key Point2, c chan PointT) {
 	h := curve.HashToG1(msg)
-	targetPoint, _ := h.Pair(key)
-	c <- targetPoint
-}
-
-//Verify checks that a single message has been signed by a set of keys
-//vulnerable against chosen key attack, if keys have not been authenticated
-func (m MultiSig) Verify(curve CurveSystem) bool {
-	return VerifyMultiSignature(curve, m.sig, m.keys, m.msg)
-}
-
-// VerifyMultiSignature checks that the aggregate signature correctly proves that a single message has been signed by a set of keys,
-// vulnerable against chosen key attack, if keys have not been authenticated
-func VerifyMultiSignature(curve CurveSystem, aggsig Point1, keys []Point2, msg []byte) bool {
-	vs := AggregateG2(keys)
-	c := make(chan PointT)
-	go concurrentPair(curve, aggsig, curve.GetG2(), c)
-	go concurrentMsgPair(curve, msg, vs, c)
-	e1 := <-c
-	e2 := <-c
-	return e1.Equals(e2)
+	concurrentPair(curve, h, key, c)
 }
 
 func containsDuplicateMessage(msgs [][]byte) bool {
