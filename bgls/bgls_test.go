@@ -24,12 +24,12 @@ func TestSingleSigner(t *testing.T) {
 		_, err = rand.Read(d)
 		assert.Nil(t, err, "test data generation failed")
 		sig := Sign(curve, sk, d)
-		assert.True(t, Verify(curve, vk, d, sig), "Point1 verification failed")
+		assert.True(t, VerifySingleSignature(curve, vk, d, sig), "Point1 verification failed")
 
 		sigTmp := sig.Copy()
 		sigTmp, _ = sigTmp.Add(curve.GetG1())
 		sig2 := sigTmp
-		assert.False(t, Verify(curve, vk, d, sig2), "Point1 verification succeeding when it shouldn't")
+		assert.False(t, VerifySingleSignature(curve, vk, d, sig2), "Point1 verification succeeding when it shouldn't")
 
 		// TODO Add tests to show that this doesn't succeed if d or vk is altered
 	}
@@ -105,7 +105,7 @@ func TestMultiSig(t *testing.T) {
 }
 
 func TestMultiSigWithMultiplicity(t *testing.T) {
-	for _, curve := range curves[:1] { //TODO add back in testing bls12 once G2.Mul(0) gives identity, or there is a better way to get identity
+	for _, curve := range curves {
 		Tests, Size, Signers := 5, 32, 10
 		for i := 0; i < Tests; i++ {
 			msg := make([]byte, Size)
@@ -182,7 +182,7 @@ func BenchmarkVerification(b *testing.B) {
 	sig := Sign(curve, sk, message)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if !Verify(curve, vk, message, sig) {
+		if !VerifySingleSignature(curve, vk, message, sig) {
 			b.Error("verification failed")
 		}
 	}

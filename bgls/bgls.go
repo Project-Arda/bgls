@@ -53,20 +53,19 @@ func SignCustHash(sk *big.Int, m []byte, hash func([]byte) Point1) Point1 {
 	return i
 }
 
-// Verify checks that a signature is valid
-func Verify(curve CurveSystem, pubKey Point2, m []byte, sig Point1) bool {
-	return VerifyCustHash(curve, pubKey, m, sig, curve.HashToG1)
+// VerifySingleSignature checks that a signature is valid
+func VerifySingleSignature(curve CurveSystem, pubKey Point2, m []byte, sig Point1) bool {
+	return VerifySingleSignatureCustHash(curve, pubKey, m, sig, curve.HashToG1)
 }
 
-// VerifyCustHash checks that a signature is valid with the supplied hash function
-func VerifyCustHash(curve CurveSystem, pubKey Point2, m []byte, sig Point1, hash func([]byte) Point1) bool {
-	h := hash(m)
-	p1, ok1 := h.Pair(pubKey)
-	p2, ok2 := sig.Pair(curve.GetG2())
-	if !ok1 || !ok2 {
-		return false
-	}
-	return p1.Equals(p2)
+// VerifySingleSignatureCustHash checks that a signature is valid with the supplied hash function
+func VerifySingleSignatureCustHash(curve CurveSystem, pubKey Point2, msg []byte, sig Point1, hash func([]byte) Point1) bool {
+	c := make(chan PointT)
+	go concurrentPair(curve, sig, curve.GetG2(), c)
+	go concurrentMsgPair(curve, msg, pubKey, c)
+	e1 := <-c
+	e2 := <-c
+	return e1.Equals(e2)
 }
 
 // AggregateG1 takes the sum of points on G1. This is used to convert a set of signatures into a single signature
@@ -231,4 +230,35 @@ func containsDuplicateMessage(msgs [][]byte) bool {
 		}
 	}
 	return false
+}
+
+type indexedPoint2 struct {
+	index int
+	pt    Point2
+}
+
+func scalePublicKeys(keys []Point2, factors []*big.Int) (newKeys []Point2) {
+	if factors == nil {
+		return keys
+	} else if len(keys) != len(factors) {
+		return nil
+	}
+	newKeys = make([]Point2, len(keys))
+	c := make(chan *indexedPoint2)
+	for i := 0; i < len(keys); i++ {
+		go concurrentScale(keys[i], factors[i], i, c)
+	}
+	for i := 0; i < len(keys); i++ {
+		pt := <-c
+		newKeys[pt.index] = pt.pt
+	}
+	return newKeys
+}
+
+func concurrentScale(key Point2, factor *big.Int, index int, c chan *indexedPoint2) {
+	if factor == nil {
+		c <- &indexedPoint2{index, key.Copy()}
+	} else {
+		c <- &indexedPoint2{index, key.Mul(factor)}
+	}
 }
