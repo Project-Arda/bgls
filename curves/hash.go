@@ -98,7 +98,6 @@ func sw(curve CurveSystem, t *big.Int, blind bool) (Point1, bool) {
 	var x [3]*big.Int
 	b := curve.getG1B()
 	q := curve.GetG1Q()
-	qDiv2 := curve.getG1QDivTwo()
 	rootNeg3, neg1SubRootNeg3 := curve.getFTHashParams()
 
 	//w = sqrt(-3)*t / (1 + b + t^2)
@@ -160,18 +159,16 @@ func sw(curve CurveSystem, t *big.Int, blind bool) (Point1, bool) {
 
 	// TODO Add blinded form of this
 	y := calcQuadRes(curve.g1XToYSquared(x[i]), q)
-	if parity(y, qDiv2) != parity(t, qDiv2) {
+	if parity(y, q) != parity(t, q) {
 		y.Sub(q, y)
 	}
 	// Check is set to false since its guaranteed to be on the curve
 	return curve.MakeG1Point(x[i], y, false)
 }
 
-func parity(x *big.Int, qdiv2 *big.Int) int {
-	if x.Cmp(qdiv2) < 1 {
-		return 1
-	}
-	return 0
+func parity(x *big.Int, q *big.Int) bool {
+	neg := new(big.Int).Sub(q, x)
+	return x.Cmp(neg) > 0
 }
 
 // Currently implementing first method from
