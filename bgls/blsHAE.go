@@ -42,20 +42,15 @@ func AggregateSignaturesWithHAE(sigs []Point1, pubkeys []Point2) Point1 {
 // VerifyAggregateSignatureWithHAE verifies signatures of different messages aggregated with HAE.
 func VerifyAggregateSignatureWithHAE(curve CurveSystem, aggsig Point1, pubkeys []Point2, msgs [][]byte) bool {
 	t := hashPubKeysToExponents(pubkeys)
-	newkeys := make([]Point2, len(pubkeys))
-	for i := 0; i < len(pubkeys); i++ {
-		newkeys[i] = pubkeys[i].Mul(t[i])
-	}
+	newkeys := scalePublicKeys(pubkeys, t)
 	return verifyAggSig(curve, aggsig, newkeys, msgs, true)
 }
 
 // VerifyMultiSignatureWithHAE verifies signatures of the same message aggregated with HAE.
 func VerifyMultiSignatureWithHAE(curve CurveSystem, aggsig Point1, pubkeys []Point2, msg []byte) bool {
 	t := hashPubKeysToExponents(pubkeys)
-	for i := 0; i < len(pubkeys); i++ {
-		pubkeys[i] = pubkeys[i].Mul(t[i])
-	}
-	return VerifyMultiSignature(curve, aggsig, pubkeys, msg)
+	newkeys := scalePublicKeys(pubkeys, t)
+	return VerifyMultiSignature(curve, aggsig, newkeys, msg)
 }
 
 // My hash from G^n \to \R^n is using blake2x. The inputs to the hash are the

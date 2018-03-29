@@ -37,7 +37,7 @@ func CheckAuthentication(curve CurveSystem, v Point2, authentication Point1) boo
 //CheckAuthenticationCustHash verifies that this Point2 is valid, with the specified hash function
 func CheckAuthenticationCustHash(curve CurveSystem, v Point2, authentication Point1, hash func([]byte) Point1) bool {
 	m := v.Marshal()
-	return VerifyCustHash(curve, v, m, authentication, hash)
+	return VerifySingleSignatureCustHash(curve, v, m, authentication, hash)
 }
 
 // VerifyAggregateKoskSignature verifies that the aggregated signature proves that all messages were signed by associated keys
@@ -56,33 +56,20 @@ func (m MultiSig) Verify(curve CurveSystem) bool {
 // vulnerable against chosen key attack, if keys have not been authenticated
 func VerifyMultiSignature(curve CurveSystem, aggsig Point1, keys []Point2, msg []byte) bool {
 	vs := AggregateG2(keys)
-	return VerifySingleSignature(curve, aggsig, vs, msg)
+	return VerifySingleSignature(curve, vs, msg, aggsig)
 }
 
 // VerifyMultiSignatureWithMultiplicity verifies a BLS multi signature where multiple copies of each signature may have been included in the aggregation
 func VerifyMultiSignatureWithMultiplicity(curve CurveSystem, aggsig Point1, keys []Point2, multiplicity []int64, msg []byte) bool {
-	if len(keys) != len(multiplicity) {
+	if multiplicity == nil {
+		return VerifyMultiSignature(curve, aggsig, keys, msg)
+	} else if len(keys) != len(multiplicity) {
 		return false
 	}
-	var success bool
-	//TODO use parallelism here, same style as AggregateG2, but with multiplicity
-	pk := curve.GetG2()
-	pk = pk.Mul(big.NewInt(0))
+	factors := make([]*big.Int, len(multiplicity))
 	for i := 0; i < len(keys); i++ {
-		pk, success = pk.Add(keys[i].Mul(big.NewInt(multiplicity[i])))
-		if !success {
-			return false
-		}
+		factors[i] = big.NewInt(multiplicity[i])
 	}
-	return VerifySingleSignature(curve, aggsig, pk, msg)
-}
-
-// VerifySingleSignature checks that a single signature is correct, with e(sig, g2) = e(h(msg), key)
-func VerifySingleSignature(curve CurveSystem, sig Point1, key Point2, msg []byte) bool {
-	c := make(chan PointT)
-	go concurrentPair(curve, sig, curve.GetG2(), c)
-	go concurrentMsgPair(curve, msg, key, c)
-	e1 := <-c
-	e2 := <-c
-	return e1.Equals(e2)
+	scaledKeys := scalePublicKeys(keys, factors)
+	return VerifyMultiSignature(curve, aggsig, scaledKeys, msg)
 }
