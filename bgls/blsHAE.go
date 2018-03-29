@@ -27,35 +27,32 @@ import (
 // AggregateSignaturesWithHAE aggregates the signatures, using the
 // hashed exponents derived from the pubkeys to protect against the rogue
 // public key attack.
-func AggregateSignaturesWithHAE(sigs []Point1, pubkeys []Point2) Point1 {
+func AggregateSignaturesWithHAE(sigs []Point, pubkeys []Point) Point {
 	if len(pubkeys) != len(sigs) {
 		return nil
 	}
-	newsigs := make([]Point1, len(sigs))
 	t := hashPubKeysToExponents(pubkeys)
-	for i := 0; i < len(pubkeys); i++ {
-		newsigs[i] = sigs[i].Mul(t[i])
-	}
-	return AggregateG1(newsigs)
+	newsigs := scalePoints(sigs, t)
+	return AggregatePoints(newsigs)
 }
 
 // VerifyAggregateSignatureWithHAE verifies signatures of different messages aggregated with HAE.
-func VerifyAggregateSignatureWithHAE(curve CurveSystem, aggsig Point1, pubkeys []Point2, msgs [][]byte) bool {
+func VerifyAggregateSignatureWithHAE(curve CurveSystem, aggsig Point, pubkeys []Point, msgs [][]byte) bool {
 	t := hashPubKeysToExponents(pubkeys)
-	newkeys := scalePublicKeys(pubkeys, t)
+	newkeys := scalePoints(pubkeys, t)
 	return verifyAggSig(curve, aggsig, newkeys, msgs, true)
 }
 
 // VerifyMultiSignatureWithHAE verifies signatures of the same message aggregated with HAE.
-func VerifyMultiSignatureWithHAE(curve CurveSystem, aggsig Point1, pubkeys []Point2, msg []byte) bool {
+func VerifyMultiSignatureWithHAE(curve CurveSystem, aggsig Point, pubkeys []Point, msg []byte) bool {
 	t := hashPubKeysToExponents(pubkeys)
-	newkeys := scalePublicKeys(pubkeys, t)
+	newkeys := scalePoints(pubkeys, t)
 	return VerifyMultiSignature(curve, aggsig, newkeys, msg)
 }
 
 // My hash from G^n \to \R^n is using blake2x. The inputs to the hash are the
 // uncompressed marshal's of each of the pubkeys.
-func hashPubKeysToExponents(pubkeys []Point2) []*big.Int {
+func hashPubKeysToExponents(pubkeys []Point) []*big.Int {
 	hashFunc, _ := blake2b.NewXOF(uint32(16*len(pubkeys)), []byte{})
 	for i := 0; i < len(pubkeys); i++ {
 		hashFunc.Write(pubkeys[i].MarshalUncompressed())

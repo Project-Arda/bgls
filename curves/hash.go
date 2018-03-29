@@ -83,7 +83,7 @@ func sortBigInts(b1 *big.Int, b2 *big.Int) (*big.Int, *big.Int) {
 	return b1, b2
 }
 
-func fouqueTibouchiG1(curve CurveSystem, t *big.Int, blind bool) (Point1, bool) {
+func fouqueTibouchiG1(curve CurveSystem, t *big.Int, blind bool) (Point, bool) {
 	pt, ok := sw(curve, t, blind)
 	if !ok {
 		return nil, false
@@ -94,7 +94,7 @@ func fouqueTibouchiG1(curve CurveSystem, t *big.Int, blind bool) (Point1, bool) 
 
 // Shallue - van de Woestijne encoding
 // from "Indifferentiable Hashing to Barreto–Naehrig Curves"
-func sw(curve CurveSystem, t *big.Int, blind bool) (Point1, bool) {
+func sw(curve CurveSystem, t *big.Int, blind bool) (Point, bool) {
 	var x [3]*big.Int
 	b := curve.getG1B()
 	q := curve.GetG1Q()
@@ -163,7 +163,7 @@ func sw(curve CurveSystem, t *big.Int, blind bool) (Point1, bool) {
 		y.Sub(q, y)
 	}
 	// Check is set to false since its guaranteed to be on the curve
-	return curve.MakeG1Point(x[i], y, false)
+	return curve.MakeG1Point([]*big.Int{x[i], y}, false)
 }
 
 func parity(x *big.Int, q *big.Int) bool {

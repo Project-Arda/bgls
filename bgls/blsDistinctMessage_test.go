@@ -32,8 +32,8 @@ func TestDistinctMsgAggregation(t *testing.T) {
 	for _, curve := range curves {
 		N, Size := 6, 32
 		msgs := make([][]byte, N+1)
-		sigs := make([]Point1, N+1)
-		pubkeys := make([]Point2, N+1)
+		sigs := make([]Point, N+1)
+		pubkeys := make([]Point, N+1)
 		for i := 0; i < N; i++ {
 			msgs[i] = make([]byte, Size)
 			rand.Read(msgs[i])
@@ -43,7 +43,7 @@ func TestDistinctMsgAggregation(t *testing.T) {
 			pubkeys[i] = vk
 			sigs[i] = sig
 		}
-		aggSig := AggregateG1(sigs[:N])
+		aggSig := AggregatePoints(sigs[:N])
 		assert.True(t, VerifyAggregateDistinctMsg(curve, aggSig, pubkeys[:N], msgs[:N]),
 			"Aggregate Point1 verification failed")
 		assert.False(t, VerifyAggregateDistinctMsg(curve, aggSig, pubkeys[:N-1], msgs[:N]),
@@ -52,10 +52,10 @@ func TestDistinctMsgAggregation(t *testing.T) {
 		pubkeys[N] = vkf
 		sigs[N] = Sign(curve, skf, msgs[0])
 		msgs[N] = msgs[0]
-		aggSig = AggregateG1(sigs)
+		aggSig = AggregatePoints(sigs)
 		msgs[0] = msgs[1]
 		msgs[1] = msgs[N]
-		aggSig = AggregateG1(sigs[:N])
+		aggSig = AggregatePoints(sigs[:N])
 		assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N]),
 			"Aggregate Point1 succeeded with messages 0 and 1 switched")
 

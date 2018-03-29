@@ -69,7 +69,7 @@ func TestMarshal(t *testing.T) {
 				t.Error("Unmarshalling G2 is succeeding when the byte array is of the wrong length")
 			}
 
-			mulgT, _ := mulg1.Pair(curve.GetG2())
+			mulgT, _ := curve.Pair(mulg1, curve.GetG2())
 			marshalled = mulgT.Marshal()
 			if recoveredGT, ok := curve.UnmarshalGT(marshalled); ok {
 				assert.True(t, recoveredGT.Equals(mulgT),

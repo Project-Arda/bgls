@@ -14,13 +14,13 @@ import (
 // the public key before the message.
 
 //Sign creates a signature on a message with a private key
-func SignDistinctMsg(curve CurveSystem, sk *big.Int, m []byte) Point1 {
+func SignDistinctMsg(curve CurveSystem, sk *big.Int, m []byte) Point {
 	return SignDistinctMsgCustHash(curve, sk, m, curve.HashToG1)
 }
 
 // SignCustHash creates a signature on a message with a private key, using
 // a supplied function to hash to g1.
-func SignDistinctMsgCustHash(curve CurveSystem, sk *big.Int, m []byte, hash func([]byte) Point1) Point1 {
+func SignDistinctMsgCustHash(curve CurveSystem, sk *big.Int, m []byte, hash func([]byte) Point) Point {
 	msg := append(LoadPublicKey(curve, sk).MarshalUncompressed(), m...)
 	h := hash(msg)
 	i := h.Mul(sk)
@@ -28,12 +28,12 @@ func SignDistinctMsgCustHash(curve CurveSystem, sk *big.Int, m []byte, hash func
 }
 
 // VerifyDistinctMsg checks that a single 'Distinct Message' signature is valid
-func VerifyDistinctMsg(curve CurveSystem, pubKey Point2, m []byte, sig Point1) bool {
+func VerifyDistinctMsg(curve CurveSystem, pubKey Point, m []byte, sig Point) bool {
 	msg := append(pubKey.MarshalUncompressed(), m...)
 	return VerifySingleSignature(curve, pubKey, msg, sig)
 }
 
-func VerifyAggregateDistinctMsg(curve CurveSystem, aggsig Point1, keys []Point2, msgs [][]byte) bool {
+func VerifyAggregateDistinctMsg(curve CurveSystem, aggsig Point, keys []Point, msgs [][]byte) bool {
 	if len(keys) != len(msgs) {
 		return false
 	}
