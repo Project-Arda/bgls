@@ -18,31 +18,31 @@ import (
 
 // Authenticate generates an Authentication for a valid *big.Int/Point2 combo
 // It signs a verification key with x.
-func Authenticate(curve CurveSystem, sk *big.Int) Point1 {
+func Authenticate(curve CurveSystem, sk *big.Int) Point {
 	return AuthenticateCustHash(curve, sk, curve.HashToG1)
 }
 
 // AuthenticateCustHash generates an Authentication for a valid *big.Int/Point2 combo
 // It signs a verification key with x. This runs with the specified hash function.
-func AuthenticateCustHash(curve CurveSystem, sk *big.Int, hash func([]byte) Point1) Point1 {
+func AuthenticateCustHash(curve CurveSystem, sk *big.Int, hash func([]byte) Point) Point {
 	m := LoadPublicKey(curve, sk).Marshal()
 	return SignCustHash(sk, m, hash)
 }
 
 //CheckAuthentication verifies that this Point2 is valid
-func CheckAuthentication(curve CurveSystem, v Point2, authentication Point1) bool {
+func CheckAuthentication(curve CurveSystem, v Point, authentication Point) bool {
 	return CheckAuthenticationCustHash(curve, v, authentication, curve.HashToG1)
 }
 
 //CheckAuthenticationCustHash verifies that this Point2 is valid, with the specified hash function
-func CheckAuthenticationCustHash(curve CurveSystem, v Point2, authentication Point1, hash func([]byte) Point1) bool {
+func CheckAuthenticationCustHash(curve CurveSystem, v Point, authentication Point, hash func([]byte) Point) bool {
 	m := v.Marshal()
 	return VerifySingleSignatureCustHash(curve, v, m, authentication, hash)
 }
 
 // VerifyAggregateKoskSignature verifies that the aggregated signature proves that all messages were signed by associated keys
 // Will fail under duplicate messages, unless allow duplicates is True.
-func VerifyAggregateKoskSignature(curve CurveSystem, aggsig Point1, keys []Point2, msgs [][]byte) bool {
+func VerifyAggregateKoskSignature(curve CurveSystem, aggsig Point, keys []Point, msgs [][]byte) bool {
 	return verifyAggSig(curve, aggsig, keys, msgs, true)
 }
 
@@ -54,13 +54,13 @@ func (m MultiSig) Verify(curve CurveSystem) bool {
 
 // VerifyMultiSignature checks that the aggregate signature correctly proves that a single message has been signed by a set of keys,
 // vulnerable against chosen key attack, if keys have not been authenticated
-func VerifyMultiSignature(curve CurveSystem, aggsig Point1, keys []Point2, msg []byte) bool {
-	vs := AggregateG2(keys)
+func VerifyMultiSignature(curve CurveSystem, aggsig Point, keys []Point, msg []byte) bool {
+	vs := AggregatePoints(keys)
 	return VerifySingleSignature(curve, vs, msg, aggsig)
 }
 
 // VerifyMultiSignatureWithMultiplicity verifies a BLS multi signature where multiple copies of each signature may have been included in the aggregation
-func VerifyMultiSignatureWithMultiplicity(curve CurveSystem, aggsig Point1, keys []Point2, multiplicity []int64, msg []byte) bool {
+func VerifyMultiSignatureWithMultiplicity(curve CurveSystem, aggsig Point, keys []Point, multiplicity []int64, msg []byte) bool {
 	if multiplicity == nil {
 		return VerifyMultiSignature(curve, aggsig, keys, msg)
 	} else if len(keys) != len(multiplicity) {
@@ -70,6 +70,6 @@ func VerifyMultiSignatureWithMultiplicity(curve CurveSystem, aggsig Point1, keys
 	for i := 0; i < len(keys); i++ {
 		factors[i] = big.NewInt(multiplicity[i])
 	}
-	scaledKeys := scalePublicKeys(keys, factors)
+	scaledKeys := scalePoints(keys, factors)
 	return VerifyMultiSignature(curve, aggsig, scaledKeys, msg)
 }

@@ -39,8 +39,8 @@ func TestAggregation(t *testing.T) {
 	for _, curve := range curves {
 		N, Size := 6, 32
 		msgs := make([][]byte, N+1)
-		sigs := make([]Point1, N+1)
-		pubkeys := make([]Point2, N+1)
+		sigs := make([]Point, N+1)
+		pubkeys := make([]Point, N+1)
 		for i := 0; i < N; i++ {
 			msgs[i] = make([]byte, Size)
 			rand.Read(msgs[i])
@@ -50,7 +50,7 @@ func TestAggregation(t *testing.T) {
 			pubkeys[i] = vk
 			sigs[i] = sig
 		}
-		aggSig := AggregateG1(sigs[:N])
+		aggSig := AggregatePoints(sigs[:N])
 		assert.True(t, VerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N]),
 			"Aggregate Point1 verification failed")
 		assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys[:N-1], msgs[:N]),
@@ -59,7 +59,7 @@ func TestAggregation(t *testing.T) {
 		pubkeys[N] = vkf
 		sigs[N] = Sign(curve, skf, msgs[0])
 		msgs[N] = msgs[0]
-		aggSig = AggregateG1(sigs)
+		aggSig = AggregatePoints(sigs)
 		assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys, msgs),
 			"Aggregate Signature succeeding with duplicate messages")
 		assert.True(t, VerifyAggregateKoskSignature(curve, aggSig, pubkeys, msgs),
@@ -68,7 +68,7 @@ func TestAggregation(t *testing.T) {
 			"Aggregate Point1 succeeding with invalid signature")
 		msgs[0] = msgs[1]
 		msgs[1] = msgs[N]
-		aggSig = AggregateG1(sigs[:N])
+		aggSig = AggregatePoints(sigs[:N])
 		assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N]),
 			"Aggregate Point1 succeeded with messages 0 and 1 switched")
 
@@ -82,14 +82,14 @@ func TestMultiSig(t *testing.T) {
 		for i := 0; i < Tests; i++ {
 			msg := make([]byte, Size)
 			rand.Read(msg)
-			signers := make([]Point2, Signers)
-			sigs := make([]Point1, Signers)
+			signers := make([]Point, Signers)
+			sigs := make([]Point, Signers)
 			for j := 0; j < Signers; j++ {
 				sk, vk, _ := KeyGen(curve)
 				sigs[j] = Sign(curve, sk, msg)
 				signers[j] = vk
 			}
-			aggSig := AggregateG1(sigs)
+			aggSig := AggregatePoints(sigs)
 			assert.True(t, VerifyMultiSignature(curve, aggSig, signers, msg),
 				"Aggregate MultiSig verification failed")
 			msg2 := make([]byte, Size)
@@ -110,8 +110,8 @@ func TestMultiSigWithMultiplicity(t *testing.T) {
 		for i := 0; i < Tests; i++ {
 			msg := make([]byte, Size)
 			rand.Read(msg)
-			signers := make([]Point2, Signers)
-			sigs := make([]Point1, Signers)
+			signers := make([]Point, Signers)
+			sigs := make([]Point, Signers)
 			multi := make([]int64, Signers)
 			for j := 0; j < Signers; j++ {
 				sk, vk, _ := KeyGen(curve)
@@ -119,7 +119,7 @@ func TestMultiSigWithMultiplicity(t *testing.T) {
 				sigs[j] = Sign(curve, sk, msg).Mul(big.NewInt(multi[j]))
 				signers[j] = vk
 			}
-			aggSig := AggregateG1(sigs)
+			aggSig := AggregatePoints(sigs)
 			assert.True(t, VerifyMultiSignatureWithMultiplicity(curve, aggSig, signers, multi, msg),
 				"Aggregate MultiSig verification failed")
 			msg2 := make([]byte, Size)
@@ -188,13 +188,13 @@ func BenchmarkVerification(b *testing.B) {
 	}
 }
 
-var vks []Point2
-var sgs []Point1
+var vks []Point
+var sgs []Point
 var msg []byte
 
 func benchmulti(b *testing.B, k int) {
 	curve := Altbn128
-	multisig := MultiSig{vks[:k], AggregateG1(sgs[:k]), msg}
+	multisig := MultiSig{vks[:k], AggregatePoints(sgs[:k]), msg}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if !multisig.Verify(curve) {
@@ -229,8 +229,8 @@ func BenchmarkMultiVerification2048(b *testing.B) {
 
 func BenchmarkAggregateVerification(b *testing.B) {
 	curve := Altbn128
-	verifkeys := make([]Point2, b.N)
-	sigs := make([]Point1, b.N)
+	verifkeys := make([]Point, b.N)
+	sigs := make([]Point, b.N)
 	messages := make([][]byte, b.N)
 	for i := 0; i < b.N; i++ {
 		messages[i] = make([]byte, 64)
@@ -239,7 +239,7 @@ func BenchmarkAggregateVerification(b *testing.B) {
 		verifkeys[i] = vk
 		sigs[i] = Sign(curve, sk, messages[i])
 	}
-	aggsig := AggSig{verifkeys, messages, AggregateG1(sigs)}
+	aggsig := AggSig{verifkeys, messages, AggregatePoints(sigs)}
 	b.ResetTimer()
 	if !aggsig.Verify(curve) {
 		b.Error("Aggregate verificaton failed")

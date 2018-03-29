@@ -12,25 +12,25 @@ import (
 type CurveSystem interface {
 	Name() string
 
-	MakeG1Point(*big.Int, *big.Int, bool) (Point1, bool)
+	MakeG1Point([]*big.Int, bool) (Point, bool)
 	// MakeG2Point(*big.Int, *big.Int, *big.Int, *big.Int) (Point2, bool)
 	// MakeGTPoint(*big.Int, *big.Int) (PointT, bool)
 
 	//
 	// GTToAffineCoords(PointT) (*big.Int, *big.Int)
 
-	UnmarshalG1([]byte) (Point1, bool)
-	UnmarshalG2([]byte) (Point2, bool)
+	UnmarshalG1([]byte) (Point, bool)
+	UnmarshalG2([]byte) (Point, bool)
 	UnmarshalGT([]byte) (PointT, bool)
 
-	GetG1() Point1
-	GetG2() Point2
+	GetG1() Point
+	GetG2() Point
 	GetGT() PointT
 
-	GetG1Infinity() Point1
-	GetG2Infinity() Point2
+	GetG1Infinity() Point
+	GetG2Infinity() Point
 
-	HashToG1(message []byte) Point1
+	HashToG1(message []byte) Point
 
 	GetG1Q() *big.Int
 	GetG1Order() *big.Int
@@ -43,33 +43,22 @@ type CurveSystem interface {
 	// Fouque-Tibouchi hash parameters, sqrt(-3), (-1 + sqrt(-3))/2 computed in F_q
 	getFTHashParams() (*big.Int, *big.Int)
 	g1XToYSquared(*big.Int) *big.Int
+
+	Pair(Point, Point) (PointT, bool)
 }
 
-// Point1 is a way to represent a point on G1, in the first elliptic curve.
-type Point1 interface {
-	Add(Point1) (Point1, bool)
-	Copy() Point1
-	Equals(Point1) bool
+// Point is a way to represent a point on G1 or G2, in the first two elliptic curves.
+type Point interface {
+	Add(Point) (Point, bool)
+	Copy() Point
+	Equals(Point) bool
 	Marshal() []byte
 	MarshalUncompressed() []byte
-	Mul(*big.Int) Point1
-	Negate() Point1
-	Pair(Point2) (PointT, bool)
-	ToAffineCoords() (*big.Int, *big.Int)
+	Mul(*big.Int) Point
+	ToAffineCoords() []*big.Int
 }
 
-// Point2 is a way to represent a point on G2, in the first elliptic curve.
-type Point2 interface {
-	Add(Point2) (Point2, bool)
-	Copy() Point2
-	Equals(Point2) bool
-	Marshal() []byte
-	MarshalUncompressed() []byte
-	Mul(*big.Int) Point2
-	ToAffineCoords() (*big.Int, *big.Int, *big.Int, *big.Int)
-}
-
-// PointT is a way to represent a point on GT, in the first elliptic curve.
+// PointT is a way to represent a point on GT, in the target group
 type PointT interface {
 	Add(PointT) (PointT, bool)
 	Copy() PointT

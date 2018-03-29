@@ -29,7 +29,7 @@ type bls12PointT struct {
 // Bls12 is the instance for the bls12 curve, with all of its functions.
 var Bls12 = &bls12Curve{}
 
-func (pt *bls12Point1) Add(otherPt Point1) (Point1, bool) {
+func (pt *bls12Point1) Add(otherPt Point) (Point, bool) {
 	g1Copy, _ := pt.Copy().(*bls12Point1)
 	if other, ok := (otherPt).(*bls12Point1); ok {
 		sum := g1Copy.point.Add(other.point).(*bls12.G1)
@@ -39,12 +39,12 @@ func (pt *bls12Point1) Add(otherPt Point1) (Point1, bool) {
 	return nil, false
 }
 
-func (pt *bls12Point1) Copy() Point1 {
+func (pt *bls12Point1) Copy() Point {
 	result := bls12Point1{pt.point.Copy().(*bls12.G1)}
 	return &result
 }
 
-func (pt *bls12Point1) Equals(otherPt Point1) bool {
+func (pt *bls12Point1) Equals(otherPt Point) bool {
 	if other, ok := (otherPt).(*bls12Point1); ok {
 		return pt.point.Equal(other.point)
 	}
@@ -60,11 +60,11 @@ func (pt *bls12Point1) MarshalUncompressed() []byte {
 	return pt.point.MarshalUncompressed()
 }
 
-func (pt *bls12Point1) Mul(scalar *big.Int) Point1 {
+func (pt *bls12Point1) Mul(scalar *big.Int) Point {
 	prod, _ := pt.Copy().(*bls12Point1)
 	cmp := scalar.Cmp(zero)
 	if cmp < 0 {
-		prod = prod.Negate().(*bls12Point1)
+		prod = prod.Negate()
 		scalar.Mul(scalar, big.NewInt(-1))
 	} else if cmp == 0 {
 		return Bls12.GetG1Infinity()
@@ -73,30 +73,21 @@ func (pt *bls12Point1) Mul(scalar *big.Int) Point1 {
 	return prod
 }
 
-func (pt *bls12Point1) Negate() Point1 {
-	x, y := pt.ToAffineCoords()
-	y.Sub(bls12Q, y)
-	newPt, _ := Bls12.MakeG1Point(x, y, false)
-	return newPt
+func (pt *bls12Point1) Negate() *bls12Point1 {
+	coords := pt.ToAffineCoords()
+	coords[1].Sub(bls12Q, coords[1])
+	newPt, _ := Bls12.MakeG1Point(coords, false)
+	return newPt.(*bls12Point1)
 }
 
-func (pt *bls12Point1) ToAffineCoords() (x, y *big.Int) {
+func (pt *bls12Point1) ToAffineCoords() []*big.Int {
 	// Upstream library uses projective space
 	pt.point.Normalize()
 	blsx, blsy, _ := pt.point.GetXYZ()
-	return blsx.ToInt()[0], blsy.ToInt()[0]
+	return []*big.Int{blsx.ToInt()[0], blsy.ToInt()[0]}
 }
 
-func (pt *bls12Point1) Pair(otherPt Point2) (PointT, bool) {
-	if other, ok := (otherPt).(*bls12Point2); ok {
-		p3 := new(bls12.GT).Pair(pt.point, other.point)
-		ret := bls12PointT{p3}
-		return ret, true
-	}
-	return nil, false
-}
-
-func (pt *bls12Point2) Add(otherPt Point2) (Point2, bool) {
+func (pt *bls12Point2) Add(otherPt Point) (Point, bool) {
 	copy, _ := pt.Copy().(*bls12Point2)
 	if other, ok := (otherPt).(*bls12Point2); ok {
 		sum := copy.point.Add(other.point).(*bls12.G2)
@@ -106,12 +97,12 @@ func (pt *bls12Point2) Add(otherPt Point2) (Point2, bool) {
 	return nil, false
 }
 
-func (pt *bls12Point2) Copy() Point2 {
+func (pt *bls12Point2) Copy() Point {
 	result := bls12Point2{pt.point.Copy().(*bls12.G2)}
 	return &result
 }
 
-func (pt *bls12Point2) Equals(otherPt Point2) bool {
+func (pt *bls12Point2) Equals(otherPt Point) bool {
 	if other, ok := (otherPt).(*bls12Point2); ok {
 		return pt.point.Equal(other.point)
 	}
@@ -127,7 +118,7 @@ func (pt *bls12Point2) MarshalUncompressed() []byte {
 	return pt.point.MarshalUncompressed()
 }
 
-func (pt *bls12Point2) Mul(scalar *big.Int) Point2 {
+func (pt *bls12Point2) Mul(scalar *big.Int) Point {
 	if scalar.Cmp(zero) == 0 {
 		return Bls12.GetG2Infinity()
 	}
@@ -136,16 +127,16 @@ func (pt *bls12Point2) Mul(scalar *big.Int) Point2 {
 	return prod
 }
 
-func (pt *bls12Point2) ToAffineCoords() (xx, xy, yx, yy *big.Int) {
+func (pt *bls12Point2) ToAffineCoords() []*big.Int {
 	// TODO Test this method
 	Bytestream := pt.point.MarshalUncompressed()
 	xxBytes, xyBytes := Bytestream[:48], Bytestream[48:96]
 	yxBytes, yyBytes := Bytestream[96:144], Bytestream[144:192]
-	xx = new(big.Int).SetBytes(xxBytes)
-	xy = new(big.Int).SetBytes(xyBytes)
-	yx = new(big.Int).SetBytes(yxBytes)
-	yy = new(big.Int).SetBytes(yyBytes)
-	return
+	xx := new(big.Int).SetBytes(xxBytes)
+	xy := new(big.Int).SetBytes(xyBytes)
+	yx := new(big.Int).SetBytes(yxBytes)
+	yy := new(big.Int).SetBytes(yyBytes)
+	return []*big.Int{xx, xy, yx, yy}
 }
 
 func (pt bls12PointT) Add(otherPt PointT) (PointT, bool) {
@@ -184,16 +175,26 @@ func (curve *bls12Curve) Name() string {
 	return "bls12"
 }
 
-func (curve *bls12Curve) MakeG1Point(x, y *big.Int, check bool) (Point1, bool) {
+func (curve *bls12Curve) MakeG1Point(coords []*big.Int, check bool) (Point, bool) {
 	pt := new(bls12.G1)
-	pt.SetXY(bls12.FqFromInt(x), bls12.FqFromInt(y))
+	pt.SetXY(bls12.FqFromInt(coords[0]), bls12.FqFromInt(coords[1]))
 	if check && !pt.Check() {
 		return nil, false
 	}
 	return &bls12Point1{pt}, true
 }
 
-func (curve *bls12Curve) UnmarshalG1(data []byte) (Point1, bool) {
+func (curve *bls12Curve) Pair(pt1 Point, pt2 Point) (PointT, bool) {
+	p1, ok1 := pt1.(*bls12Point1)
+	if p2, ok2 := pt2.(*bls12Point2); ok1 && ok2 {
+		p3 := new(bls12.GT).Pair(p1.point, p2.point)
+		ret := bls12PointT{p3}
+		return ret, true
+	}
+	return nil, false
+}
+
+func (curve *bls12Curve) UnmarshalG1(data []byte) (Point, bool) {
 	if len(data) != 48 && len(data) != 96 {
 		return nil, false
 	}
@@ -205,7 +206,7 @@ func (curve *bls12Curve) UnmarshalG1(data []byte) (Point1, bool) {
 	return &bls12Point1{result}, true
 }
 
-func (curve *bls12Curve) UnmarshalG2(data []byte) (Point2, bool) {
+func (curve *bls12Curve) UnmarshalG2(data []byte) (Point, bool) {
 	if len(data) != 96 && len(data) != 192 {
 		return nil, false
 	}
@@ -226,11 +227,11 @@ func (curve *bls12Curve) UnmarshalGT(data []byte) (PointT, bool) {
 	return &bls12PointT{result}, true
 }
 
-func (curve *bls12Curve) GetG1() Point1 {
+func (curve *bls12Curve) GetG1() Point {
 	return &bls12Point1{bls12.G1One()}
 }
 
-func (curve *bls12Curve) GetG2() Point2 {
+func (curve *bls12Curve) GetG2() Point {
 	return &bls12Point2{bls12.G2One()}
 }
 
@@ -238,11 +239,11 @@ func (curve *bls12Curve) GetGT() PointT {
 	return bls12GT
 }
 
-func (curve *bls12Curve) GetG1Infinity() Point1 {
+func (curve *bls12Curve) GetG1Infinity() Point {
 	return &bls12Point1{bls12.G1Zero()}
 }
 
-func (curve *bls12Curve) GetG2Infinity() Point2 {
+func (curve *bls12Curve) GetG2Infinity() Point {
 	return &bls12Point2{bls12.G2Zero()}
 }
 
@@ -287,7 +288,7 @@ var bls12SwencSqrtNegThreeMinusOneOverTwo, _ = new(big.Int).SetString("793479390
 var bls12SwencSqrtNegThree, _ = new(big.Int).SetString("1586958781458431025242759403266842894121773480562120986020912974854563298150952611241517463240701", 10)
 var bls12Cofactor, _ = new(big.Int).SetString("76329603384216526031706109802092473003", 10)
 var bls12Order, _ = new(big.Int).SetString("52435875175126190479447740508185965837690552500527637822603658699938581184513", 10)
-var bls12GT, _ = Bls12.GetG1().Pair(Bls12.GetG2())
+var bls12GT, _ = Bls12.Pair(Bls12.GetG1(), Bls12.GetG2())
 var bls12G1Tag1 = []byte("G1_0")
 var bls12G1Tag2 = []byte("G1_1")
 
@@ -295,19 +296,19 @@ var bls12FTRoot1, _ = new(big.Int).SetString("2482943257342666496574051628958211
 var bls12FTRoot2, _ = new(big.Int).SetString("3754115229487400743760384662840082984744650971178826659753975400945528899667118516813924993650507119217982417812692", 10)
 
 // Fouque Tibouchi hashing as specified in https://github.com/ebfull/pairing/pull/30
-func (curve *bls12Curve) HashToG1(message []byte) Point1 {
+func (curve *bls12Curve) HashToG1(message []byte) Point {
 	return hashToG1BlindingAbstracted(message, false)
 }
 
 // Fouque Tibouchi hashing as specified in https://github.com/ebfull/pairing/pull/30
 // This also adds time blinding
-func (curve *bls12Curve) HashToG1Blind(message []byte) Point1 {
+func (curve *bls12Curve) HashToG1Blind(message []byte) Point {
 	return hashToG1BlindingAbstracted(message, true)
 }
 
 // This hashes a given message to G1, and the second parameter specifies whether
 // or not to blind the computation, to prevent timing information from being leaked.
-func hashToG1BlindingAbstracted(message []byte, blind bool) Point1 {
+func hashToG1BlindingAbstracted(message []byte, blind bool) Point {
 	b2, _ := blake2b.New512(nil)
 	b2.Write(message)
 	b2Copy, _ := blake2b.Clone(b2)
@@ -322,21 +323,17 @@ func hashToG1BlindingAbstracted(message []byte, blind bool) Point1 {
 	return pt1
 }
 
-func bls12FouqueTibouchi(tBytes []byte, blind bool) Point1 {
+func bls12FouqueTibouchi(tBytes []byte, blind bool) Point {
 	t := new(big.Int).SetBytes(tBytes)
 	t.Mod(t, bls12Q)
 	// Explicitly handle degenerate cases for t
 	if t.Cmp(zero) == 0 { // Hash(0) = infty
-		pt, _ := Bls12.MakeG1Point(zero, zero, false)
+		pt := Bls12.GetG1Infinity()
 		return pt
 	} else if t.Cmp(bls12FTRoot1) == 0 { // encode(sqrt(-5)) = -g1
 		return Bls12.GetG1()
 	} else if t.Cmp(bls12FTRoot2) == 0 { // encode(-sqrt(-5)) = g1
-		pt := new(bls12.G1)
-		g1x, g1y := Bls12.GetG1().ToAffineCoords()
-		g1y.Sub(bls12Q, g1y)
-		pt.SetXY(bls12.FqFromInt(g1x), bls12.FqFromInt(g1y))
-		return &bls12Point1{pt}
+		return Bls12.GetG1().(*bls12Point1).Negate()
 	}
 
 	pt, _ := fouqueTibouchiG1(Bls12, t, blind)

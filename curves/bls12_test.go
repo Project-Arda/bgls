@@ -26,7 +26,7 @@ func TestG1BlindingMatches(t *testing.T) {
 
 func TestG1SwEncodeDegenerate(t *testing.T) {
 	// Check that bls12FouqueTibouchi([0]) = point at infinity
-	infty, _ := Bls12.MakeG1Point(zero, zero, false)
+	infty := Bls12.GetG1Infinity()
 	var zeroArr []byte
 	chkInfty := bls12FouqueTibouchi(zeroArr, false)
 	assert.True(t, chkInfty.Equals(infty), "Degenerate case for t=0 did not return the point at infinity.")
@@ -39,15 +39,15 @@ func TestG1SwEncodeDegenerate(t *testing.T) {
 	sqrtNeg5 = calcQuadRes(sqrtNeg5, bls12Q)
 	tBytes := sqrtNeg5.Bytes()
 	chkNegG1 := bls12FouqueTibouchi(tBytes, false)
-	_, y := chkNegG1.ToAffineCoords()
-	assert.True(t, parity(y, bls12Q) == parity(sqrtNeg5, bls12Q), "Parity for t=sqrt(-5) doesn't match return value")
+	coords := chkNegG1.ToAffineCoords()
+	assert.True(t, parity(coords[1], bls12Q) == parity(sqrtNeg5, bls12Q), "Parity for t=sqrt(-5) doesn't match return value")
 	assert.True(t, chkNegG1.Equals(negG1), "Degenerate case for t=sqrt(-5) did not return g1.")
 	// Invert the parity of sqrtNeg5, and check the other side
 	sqrtNeg5.Sub(bls12Q, sqrtNeg5)
 	tBytes = sqrtNeg5.Bytes()
 	chkG1 := bls12FouqueTibouchi(tBytes, false)
-	_, y = chkG1.ToAffineCoords()
-	assert.True(t, parity(y, bls12Q) == parity(sqrtNeg5, bls12Q), "Parity for t=-sqrt(-5) doesn't match return value")
+	coords = chkG1.ToAffineCoords()
+	assert.True(t, parity(coords[1], bls12Q) == parity(sqrtNeg5, bls12Q), "Parity for t=-sqrt(-5) doesn't match return value")
 	assert.True(t, chkG1.Equals(g1), "Degenerate case for t=-sqrt(-5) did not return g1.")
 	chkInfty, _ = g1.Add(negG1)
 	assert.True(t, chkInfty.Equals(infty), "Point at infinity isn't being returned under addition")
@@ -59,7 +59,7 @@ func TestKnownBls12G1Hashes(t *testing.T) {
 	p := Bls12.HashToG1(msg)
 	x, _ := new(big.Int).SetString("315124130825307604287835216317628428134609737854237653839182597515996444073032649481416725367158979153513345579672", 10)
 	y, _ := new(big.Int).SetString("3093537746211397858160667262592024570071165158580434464756577567510401504168962073691924150397172185836012224315174", 10)
-	q, ok := Bls12.MakeG1Point(x, y, true)
+	q, ok := Bls12.MakeG1Point([]*big.Int{x, y}, true)
 	if !ok {
 		t.Error("known point not registering as on the curve")
 	}

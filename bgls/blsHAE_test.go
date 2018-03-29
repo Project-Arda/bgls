@@ -15,8 +15,8 @@ func TestAggregationWithHAE(t *testing.T) {
 	for _, curve := range curves {
 		N, Size := 6, 32
 		msgs := make([][]byte, N+1)
-		sigs := make([]Point1, N+1)
-		pubkeys := make([]Point2, N+1)
+		sigs := make([]Point, N+1)
+		pubkeys := make([]Point, N+1)
 		for i := 0; i < N; i++ {
 			msgs[i] = make([]byte, Size)
 			rand.Read(msgs[i])
@@ -42,7 +42,7 @@ func TestAggregationWithHAE(t *testing.T) {
 			"Aggregate Point1 succeeding with invalid signature")
 		msgs[0] = msgs[1]
 		msgs[1] = msgs[N]
-		aggSig = AggregateG1(sigs[:N])
+		aggSig = AggregatePoints(sigs[:N])
 		assert.False(t, VerifyAggregateSignatureWithHAE(curve, aggSig, pubkeys[:N], msgs[:N]),
 			"Aggregate Point1 succeeded with messages 0 and 1 switched")
 
@@ -56,8 +56,8 @@ func TestMultiSigWithHAE(t *testing.T) {
 		for i := 0; i < Tests; i++ {
 			msg := make([]byte, Size)
 			rand.Read(msg)
-			signers := make([]Point2, Signers)
-			sigs := make([]Point1, Signers)
+			signers := make([]Point, Signers)
+			sigs := make([]Point, Signers)
 			for j := 0; j < Signers; j++ {
 				sk, vk, _ := KeyGen(curve)
 				sigs[j] = Sign(curve, sk, msg)
