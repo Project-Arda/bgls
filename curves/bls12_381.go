@@ -4,11 +4,11 @@
 package curves
 
 import (
+	"encoding"
+	"github.com/dis2/bls12"
+	"golang.org/x/crypto/blake2b"
 	"hash"
 	"math/big"
-
-	"github.com/ValarDragon/crypto/blake2b"
-	"github.com/dis2/bls12"
 )
 
 type bls12Curve struct {
@@ -310,8 +310,10 @@ func (curve *bls12Curve) HashToG1Blind(message []byte) Point {
 // or not to blind the computation, to prevent timing information from being leaked.
 func hashToG1BlindingAbstracted(message []byte, blind bool) Point {
 	b2, _ := blake2b.New512(nil)
+	b2Copy, _ := blake2b.New512(nil)
 	b2.Write(message)
-	b2Copy, _ := blake2b.Clone(b2)
+	b2State, _ := b2.(encoding.BinaryMarshaler).MarshalBinary()
+	b2Copy.(encoding.BinaryUnmarshaler).UnmarshalBinary(b2State)
 	t1Bytes := bls12Blake2b(b2, bls12G1Tag1)
 	pt1 := bls12FouqueTibouchi(t1Bytes, blind)
 	t2Bytes := bls12Blake2b(b2Copy, bls12G1Tag2)
