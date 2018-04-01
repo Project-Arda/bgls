@@ -13,8 +13,7 @@ type CurveSystem interface {
 	Name() string
 
 	MakeG1Point([]*big.Int, bool) (Point, bool)
-	// MakeG2Point(*big.Int, *big.Int, *big.Int, *big.Int) (Point2, bool)
-	// MakeGTPoint(*big.Int, *big.Int) (PointT, bool)
+	MakeG2Point([]*big.Int, bool) (Point, bool)
 
 	//
 	// GTToAffineCoords(PointT) (*big.Int, *big.Int)

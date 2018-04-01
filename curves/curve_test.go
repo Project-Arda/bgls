@@ -21,7 +21,7 @@ var curves = []CurveSystem{Altbn128, Bls12}
 
 func TestMarshal(t *testing.T) {
 	for _, curve := range curves {
-		numTests := 32
+		numTests := 16
 		requiredScalars := []*big.Int{big.NewInt(1), Altbn128.GetG1Order()}
 		for i := 0; i < numTests; i++ {
 			scalar, _ := rand.Int(rand.Reader, curve.GetG1Order())
@@ -80,6 +80,37 @@ func TestMarshal(t *testing.T) {
 			marshalled = marshalled[1:]
 			if _, ok := curve.UnmarshalGT(marshalled); ok {
 				t.Error("Unmarshalling GT is succeeding when the byte array is of the wrong length")
+			}
+		}
+	}
+}
+
+func TestMakePoint(t *testing.T) {
+	for _, curve := range curves {
+		numTests := 10
+		requiredScalars := []*big.Int{big.NewInt(1), Altbn128.GetG1Order()}
+		for i := 0; i < numTests; i++ {
+			scalar, _ := rand.Int(rand.Reader, curve.GetG1Order())
+			if i < len(requiredScalars) {
+				scalar = requiredScalars[i]
+			}
+
+			mulg1 := curve.GetG1().Mul(scalar)
+			coords := mulg1.ToAffineCoords()
+			if recoveredG1, ok := curve.MakeG1Point(coords, true); ok {
+				assert.True(t, recoveredG1.Equals(mulg1),
+					"Making G1 points is not consistent with G1.ToAffineCoords()")
+			} else {
+				t.Error("Making G1 point failed on scalar " + scalar.String())
+			}
+
+			mulg2 := curve.GetG2().Mul(scalar)
+			coords = mulg2.ToAffineCoords()
+			if recoveredG2, ok := curve.MakeG2Point(coords, true); ok {
+				assert.True(t, recoveredG2.Equals(mulg2),
+					"Making G2 points is not consistent with G2.ToAffineCoords()")
+			} else {
+				t.Error("Making G2 point failed on scalar " + scalar.String())
 			}
 		}
 	}
