@@ -5,7 +5,6 @@ package curves
 
 import (
 	"bytes"
-	"fmt"
 	"math/big"
 
 	"github.com/dchest/blake2b"
@@ -38,8 +37,12 @@ func (curve *altbn128) Name() string {
 }
 
 // MakeG1Point copies points into []byte and unmarshals to get around curvePoint not being exported
-// Note that check does nothing here, because the upstream library checks that the point is on the curve.
+// Check does nothing here, because the upstream library always
+// ensures that the point is on the curve.
 func (curve *altbn128) MakeG1Point(coords []*big.Int, check bool) (Point, bool) {
+	if len(coords) != 2 {
+		return nil, false
+	}
 	xBytes, yBytes := coords[0].Bytes(), coords[1].Bytes()
 	ret := make([]byte, 64)
 	copy(ret[32-len(xBytes):], xBytes)
@@ -134,6 +137,8 @@ func (curve *altbn128) Pair(g1Point Point, g2Point Point) (PointT, bool) {
 	return nil, false
 }
 
+// ToAffineCoords returns the affine coordinate representation of the point
+// in the form: [X, Y]
 func (g1Point *altbn128Point1) ToAffineCoords() []*big.Int {
 	Bytestream := g1Point.point.Marshal()
 	xBytes, yBytes := Bytestream[:32], Bytestream[32:64]
@@ -142,21 +147,25 @@ func (g1Point *altbn128Point1) ToAffineCoords() []*big.Int {
 	return []*big.Int{x, y}
 }
 
-// MakeG2Point copies points into []byte and unmarshals to get around twistPoint not being exported
-func (curve *altbn128) MakeG2Point(xx, xy, yx, yy *big.Int) (Point, bool) {
-	xxBytes, xyBytes := pad32Bytes(xx.Bytes()), pad32Bytes(xy.Bytes())
-	yxBytes, yyBytes := pad32Bytes(yx.Bytes()), pad32Bytes(yy.Bytes())
+// MakeG2Point expects coords to be of the form: [x0, x1, y0, y1],
+// where X = x0 * i + x1, and Y = y0 * i + y1
+// check does nothing, since the upstream repository always checks if the point
+// is on the curve
+func (curve *altbn128) MakeG2Point(coords []*big.Int, check bool) (Point, bool) {
+	if len(coords) != 4 {
+		return nil, false
+	}
+	x0Bytes, x1Bytes := pad32Bytes(coords[0].Bytes()), pad32Bytes(coords[1].Bytes())
+	y0Bytes, y1Bytes := pad32Bytes(coords[2].Bytes()), pad32Bytes(coords[3].Bytes())
 	ret := make([]byte, 128)
-	copy(ret[:32], xxBytes)
-	copy(ret[32:], xyBytes)
-	copy(ret[64:], yxBytes)
-	copy(ret[96:], yyBytes)
+	copy(ret[:32], x0Bytes)
+	copy(ret[32:], x1Bytes)
+	copy(ret[64:], y0Bytes)
+	copy(ret[96:], y1Bytes)
 	result := new(bn256.G2)
 	var ok error
 	_, ok = result.Unmarshal(ret)
 	if ok != nil {
-		fmt.Println(ok)
-		fmt.Println(len(xxBytes), len(xyBytes), len(yxBytes), len(yyBytes))
 		return nil, false
 	}
 	return &altbn128Point2{result}, true
@@ -214,15 +223,17 @@ func (g2Point *altbn128Point2) Mul(scalar *big.Int) Point {
 	return ret
 }
 
+// ToAffineCoords returns the affine coordinate representation of the point
+// in the form: [x0, x1, y0, y1], where X = x0 * u + x1, and Y = y0 * u + y1
 func (g2Point *altbn128Point2) ToAffineCoords() []*big.Int {
 	Bytestream := g2Point.point.Marshal()
-	xxBytes, xyBytes := Bytestream[:32], Bytestream[32:64]
-	yxBytes, yyBytes := Bytestream[64:96], Bytestream[96:128]
-	xx := new(big.Int).SetBytes(xxBytes)
-	xy := new(big.Int).SetBytes(xyBytes)
-	yx := new(big.Int).SetBytes(yxBytes)
-	yy := new(big.Int).SetBytes(yyBytes)
-	return []*big.Int{xx, xy, yx, yy}
+	x0Bytes, x1Bytes := Bytestream[:32], Bytestream[32:64]
+	y0Bytes, y1Bytes := Bytestream[64:96], Bytestream[96:128]
+	x0 := new(big.Int).SetBytes(x0Bytes)
+	x1 := new(big.Int).SetBytes(x1Bytes)
+	y0 := new(big.Int).SetBytes(y0Bytes)
+	y1 := new(big.Int).SetBytes(y1Bytes)
+	return []*big.Int{x0, x1, y0, y1}
 }
 
 func (gTPoint altbn128PointT) Add(otherPointT PointT) (PointT, bool) {
@@ -314,7 +325,7 @@ func (curve *altbn128) UnmarshalG2(data []byte) (Point, bool) {
 		xi := new(big.Int).SetBytes(xiBytes)
 		xr := new(big.Int).SetBytes(xrBytes)
 		if xi.Cmp(zero) == 0 && xr.Cmp(zero) == 0 {
-			return Altbn128.MakeG2Point(zero, zero, zero, zero)
+			return Altbn128.MakeG2Point([]*big.Int{zero, zero, zero, zero}, false)
 		}
 		x := &complexNum{xi, xr}
 		y := Altbn128.g2XToYSquared(x)
@@ -334,7 +345,7 @@ func (curve *altbn128) UnmarshalG2(data []byte) (Point, bool) {
 		} else if !yrSgn && cmpResRe == 1 {
 			y.re.Sub(altbnG1Q, y.re)
 		}
-		return Altbn128.MakeG2Point(x.im, x.re, y.im, y.re)
+		return Altbn128.MakeG2Point([]*big.Int{x.im, x.re, y.im, y.re}, false)
 	}
 	return nil, false
 }

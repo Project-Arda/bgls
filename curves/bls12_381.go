@@ -5,10 +5,11 @@ package curves
 
 import (
 	"encoding"
-	"github.com/dis2/bls12"
-	"golang.org/x/crypto/blake2b"
 	"hash"
 	"math/big"
+
+	"github.com/dis2/bls12"
+	"golang.org/x/crypto/blake2b"
 )
 
 type bls12Curve struct {
@@ -80,6 +81,8 @@ func (pt *bls12Point1) Negate() *bls12Point1 {
 	return newPt.(*bls12Point1)
 }
 
+// ToAffineCoords returns the affine coordinate representation of the point
+// in the form: [X, Y]
 func (pt *bls12Point1) ToAffineCoords() []*big.Int {
 	// Upstream library uses projective space
 	pt.point.Normalize()
@@ -127,16 +130,17 @@ func (pt *bls12Point2) Mul(scalar *big.Int) Point {
 	return prod
 }
 
+// ToAffineCoords returns the affine coordinate representation of the point
+// in the form: [x0, x1, y0, y1], where X = x0 * u + x1, and Y = y0 * u + y1
 func (pt *bls12Point2) ToAffineCoords() []*big.Int {
-	// TODO Test this method
 	Bytestream := pt.point.MarshalUncompressed()
-	xxBytes, xyBytes := Bytestream[:48], Bytestream[48:96]
-	yxBytes, yyBytes := Bytestream[96:144], Bytestream[144:192]
-	xx := new(big.Int).SetBytes(xxBytes)
-	xy := new(big.Int).SetBytes(xyBytes)
-	yx := new(big.Int).SetBytes(yxBytes)
-	yy := new(big.Int).SetBytes(yyBytes)
-	return []*big.Int{xx, xy, yx, yy}
+	x0Bytes, x1Bytes := Bytestream[:48], Bytestream[48:96]
+	y0Bytes, y1Bytes := Bytestream[96:144], Bytestream[144:192]
+	x0 := new(big.Int).SetBytes(x0Bytes)
+	x1 := new(big.Int).SetBytes(x1Bytes)
+	y0 := new(big.Int).SetBytes(y0Bytes)
+	y1 := new(big.Int).SetBytes(y1Bytes)
+	return []*big.Int{x0, x1, y0, y1}
 }
 
 func (pt bls12PointT) Add(otherPt PointT) (PointT, bool) {
@@ -175,13 +179,36 @@ func (curve *bls12Curve) Name() string {
 	return "bls12"
 }
 
+// MakeG2Point expects coords to be of the form: [X, Y]
 func (curve *bls12Curve) MakeG1Point(coords []*big.Int, check bool) (Point, bool) {
+	if len(coords) != 2 {
+		return nil, false
+	}
 	pt := new(bls12.G1)
 	pt.SetXY(bls12.FqFromInt(coords[0]), bls12.FqFromInt(coords[1]))
 	if check && !pt.Check() {
 		return nil, false
 	}
 	return &bls12Point1{pt}, true
+}
+
+// MakeG2Point expects coords to be of the form: [x0, x1, y0, y1],
+// where X = x0 * u + x1, and Y = y0 * u + y1
+func (curve *bls12Curve) MakeG2Point(coords []*big.Int, check bool) (Point, bool) {
+	if len(coords) != 4 {
+		return nil, false
+	}
+	pt := new(bls12.G2)
+	x := new(bls12.Fq2)
+	// Underlying library expects coordinates in the form [x1, x0] amd [y1, y0]
+	x.FromInt([]*big.Int{coords[1], coords[0]})
+	y := new(bls12.Fq2)
+	y.FromInt([]*big.Int{coords[3], coords[2]})
+	pt.SetXY(x, y)
+	if check && !pt.Check() {
+		return nil, false
+	}
+	return &bls12Point2{pt}, true
 }
 
 func (curve *bls12Curve) Pair(pt1 Point, pt2 Point) (PointT, bool) {

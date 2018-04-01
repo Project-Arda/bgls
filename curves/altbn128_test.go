@@ -34,6 +34,6 @@ func TestEthereumHash(t *testing.T) {
 	assert.Zero(t, coords[2].Cmp(knownyi), "yi doesn't match")
 	assert.Zero(t, coords[3].Cmp(knownyr), "yr doesn't match")
 
-	altG2, _ := curve.MakeG2Point(coords[0], coords[1], coords[2], coords[3])
+	altG2, _ := curve.MakeG2Point(coords, false)
 	assert.True(t, altG2.Equals(curve.GetG2()), "MakeG2Point Failed")
 }
