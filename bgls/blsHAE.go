@@ -32,21 +32,21 @@ func AggregateSignaturesWithHAE(sigs []Point, pubkeys []Point) Point {
 		return nil
 	}
 	t := hashPubKeysToExponents(pubkeys)
-	newsigs := scalePoints(sigs, t)
+	newsigs := ScalePoints(sigs, t)
 	return AggregatePoints(newsigs)
 }
 
 // VerifyAggregateSignatureWithHAE verifies signatures of different messages aggregated with HAE.
 func VerifyAggregateSignatureWithHAE(curve CurveSystem, aggsig Point, pubkeys []Point, msgs [][]byte) bool {
 	t := hashPubKeysToExponents(pubkeys)
-	newkeys := scalePoints(pubkeys, t)
+	newkeys := ScalePoints(pubkeys, t)
 	return verifyAggSig(curve, aggsig, newkeys, msgs, true)
 }
 
 // VerifyMultiSignatureWithHAE verifies signatures of the same message aggregated with HAE.
 func VerifyMultiSignatureWithHAE(curve CurveSystem, aggsig Point, pubkeys []Point, msg []byte) bool {
 	t := hashPubKeysToExponents(pubkeys)
-	newkeys := scalePoints(pubkeys, t)
+	newkeys := ScalePoints(pubkeys, t)
 	return VerifyMultiSignature(curve, aggsig, newkeys, msg)
 }
 

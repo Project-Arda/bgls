@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -117,6 +118,7 @@ func TestMakePoint(t *testing.T) {
 }
 
 func TestMul(t *testing.T) {
+	// TODO: Create known test cases specific to each curve from another library.
 	for _, curve := range curves {
 		numTests := 32
 		requiredScalars := []*big.Int{zero, one}
@@ -130,6 +132,49 @@ func TestMul(t *testing.T) {
 			pt2 := curve.GetG1().Mul(scalarNeg)
 			inf, _ := pt1.Add(pt2)
 			assert.True(t, inf.Equals(curve.GetG1Infinity()))
+		}
+	}
+}
+
+func TestAggregation(t *testing.T) {
+	for _, curve := range curves {
+		for _, N := range []int{2, 4, 6, 8} {
+			g1 := make([]Point, N)
+			g2 := make([]Point, N)
+			sum := new(big.Int).SetInt64(0)
+			for i := 0; i < N; i++ {
+				x, _ := rand.Int(rand.Reader, curve.GetG1Order())
+				sum.Add(sum, x)
+				sum.Mod(sum, curve.GetG1Order())
+				g1[i] = curve.GetG1().Mul(x)
+				g2[i] = curve.GetG2().Mul(x)
+			}
+			aggG1 := AggregatePoints(g1)
+			aggG2 := AggregatePoints(g2)
+			assert.True(t, aggG1.Equals(curve.GetG1().Mul(sum)), curve.Name()+" "+strconv.Itoa(N))
+			assert.True(t, aggG2.Equals(curve.GetG2().Mul(sum)), curve.Name()+" "+strconv.Itoa(N))
+		}
+	}
+}
+
+func TestScaling(t *testing.T) {
+	N := 5
+	for _, curve := range curves {
+		for _, g := range []Point{curve.GetG1(), curve.GetG2()} {
+			pts1 := make([]Point, N)
+			pts2 := make([]Point, N)
+			factors := make([]*big.Int, N)
+			for i := 0; i < N; i++ {
+				x, _ := rand.Int(rand.Reader, curve.GetG1Order())
+				pts1[i] = g.Mul(x)
+				f, _ := rand.Int(rand.Reader, curve.GetG1Order())
+				pts2[i] = pts1[i].Copy().Mul(f)
+				factors[i] = f
+			}
+			pts1 = ScalePoints(pts1, factors)
+			for i := 0; i < N; i++ {
+				assert.True(t, pts1[i].Equals(pts2[i]))
+			}
 		}
 	}
 }
