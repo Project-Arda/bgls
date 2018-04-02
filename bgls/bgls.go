@@ -68,57 +68,6 @@ func VerifySingleSignatureCustHash(curve CurveSystem, pubKey Point, msg []byte, 
 	return e1.Equals(e2)
 }
 
-// AggregatePoints takes the sum of points on G2. This is used to sum a set of public keys for the multisignature
-func AggregatePoints(points []Point) Point {
-	if len(points) == 2 { // No parallelization needed
-		aggG2, _ := points[0].Add(points[1])
-		return aggG2
-	}
-	// Aggregate all the g2 points together using concurrency
-	c := make(chan Point)
-	aggPoint := make([]Point, (len(points)/2)+(len(points)%2))
-	counter := 0
-
-	// Initialize aggKeys to an array with elements being the sum of two
-	// adjacent Points.
-	for i := 0; i < len(points); i += 2 {
-		go concurrentAggregatePoints(i, points, c)
-		counter++
-	}
-	for i := 0; i < counter; i++ {
-		aggPoint[i] = <-c
-	}
-
-	// Keep on aggregating every pair of points until only one aggregate points remains
-	for {
-		nxtAggPoint := make([]Point, (len(aggPoint)/2)+(len(aggPoint)%2))
-		counter = 0
-		if len(aggPoint) == 1 {
-			break
-		}
-		for i := 0; i < len(aggPoint); i += 2 {
-			go concurrentAggregatePoints(i, aggPoint, c)
-			counter++
-		}
-		for i := 0; i < counter; i++ {
-			nxtAggPoint[i] = <-c
-		}
-		aggPoint = nxtAggPoint
-	}
-	return aggPoint[0]
-}
-
-// concurrentAggregatePoints handles the channel for concurrent Aggregation of g2 points.
-// It only adds the element at points[start] and points[start + 1], and sends it through the channel
-func concurrentAggregatePoints(start int, points []Point, c chan Point) {
-	if start+1 >= len(points) {
-		c <- points[start]
-		return
-	}
-	summed, _ := points[start].Add(points[start+1])
-	c <- summed
-}
-
 func (a *AggSig) Verify(curve CurveSystem) bool {
 	return VerifyAggregateSignature(curve, a.sig, a.keys, a.msgs)
 }
@@ -179,35 +128,4 @@ func containsDuplicateMessage(msgs [][]byte) bool {
 		}
 	}
 	return false
-}
-
-type indexedPoint struct {
-	index int
-	pt    Point
-}
-
-func scalePoints(pts []Point, factors []*big.Int) (newKeys []Point) {
-	if factors == nil {
-		return pts
-	} else if len(pts) != len(factors) {
-		return nil
-	}
-	newKeys = make([]Point, len(pts))
-	c := make(chan *indexedPoint)
-	for i := 0; i < len(pts); i++ {
-		go concurrentScale(pts[i], factors[i], i, c)
-	}
-	for i := 0; i < len(pts); i++ {
-		pt := <-c
-		newKeys[pt.index] = pt.pt
-	}
-	return newKeys
-}
-
-func concurrentScale(key Point, factor *big.Int, index int, c chan *indexedPoint) {
-	if factor == nil {
-		c <- &indexedPoint{index, key.Copy()}
-	} else {
-		c <- &indexedPoint{index, key.Mul(factor)}
-	}
 }

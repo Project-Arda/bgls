@@ -70,6 +70,6 @@ func VerifyMultiSignatureWithMultiplicity(curve CurveSystem, aggsig Point, keys 
 	for i := 0; i < len(keys); i++ {
 		factors[i] = big.NewInt(multiplicity[i])
 	}
-	scaledKeys := scalePoints(keys, factors)
+	scaledKeys := ScalePoints(keys, factors)
 	return VerifyMultiSignature(curve, aggsig, scaledKeys, msg)
 }
