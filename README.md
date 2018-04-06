@@ -2,17 +2,21 @@
 Master: [![Build Status](https://travis-ci.org/Project-Arda/bgls.svg?branch=master)](https://travis-ci.org/Project-Arda/bgls)
 Develop: [![Build Status](https://travis-ci.org/Project-Arda/bgls.svg?branch=develop)](https://travis-ci.org/Project-Arda/bgls)
 
-Aggregate and Multi Signatures based on BGLS over Alt bn128
+Aggregate and Multi Signatures based on BGLS over Alt bn128 and BLS12-381
 
 This library provides no security against side channel attacks. We provide no security guarantees of this implementation.
 
 ## Design
-The goal of this library is to create an efficient and secure ad hoc aggregate and multi signature scheme. It relies on [alt bn128](https://github.com/ethereum/go-ethereum/tree/master/crypto/bn256) for curve and pairing operations. It implements hashing of arbitrary byte data to curve points, the standard BGLS scheme for aggregate signatures, and a custom multi signature scheme.
+The goal of this library is to create an efficient and secure ad hoc aggregate and multi signature scheme. It supports the curves [bls12-381](https://github.com/dis2/bls12) and [alt bn128](https://github.com/ethereum/go-ethereum/tree/master/crypto/bn256). It implements hashing of arbitrary byte data to curve points, the standard BGLS scheme for aggregate signatures, and a custom multi signature scheme.
 
 ### Multi Signature
-The multi signature scheme is a modification of the BGLS scheme, where all signatures are on the same message. This allows verification with a constant number of pairing operations, at the cost of being insecure to chosen key attacks. To fix the chosen key attack, users are required to prove knowledge of their secret key, through the use of the Schnorr scheme applied to their public key.
+The multi signature scheme is a modification of the BGLS scheme, where all signatures are on the same message. This allows verification with a constant number of pairing operations, at the cost of being insecure to rogue public key attacks. We have three separate solutions to the rogue public key attack implemented. (Proving knowlege of the secret key, Enforcing that messages are distinct, and performing aggregation with hashed exponents. These are described in Dan Boneh's [recent paper]((https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html)))
 
 ## Curves
+### Bls12-381
+
+This is the set of curves which zcash is switching too. Its official documentation is located [here](https://github.com/ebfull/pairing/tree/master/src/bls12_381).
+
 ### Alt bn128
 
 The group `G_1` is a cyclic group of prime order on the curve `Y^2 = X^3 + 3` defined over the field `F_p` with `p = 21888242871839275222246405745257275088696311157297823662689037894645226208583`.
@@ -28,15 +32,15 @@ The generator `g_2` is defined as: `(1155973203298638710799100402139228578392581
 The identity element for both groups (The point at infinity in affine space) is internally represented as `(0,0)`
 
 ## Benchmarks
-The following benchmarks are from a 3.80GHz i7-7700HQ CPU with 16GB ram. The aggregate verification is utilizing parallelization for the pairing operations. The multisignature has parellilization for the two involved pairing operations, and parallelization for the pairing checks at the end.
+The following benchmarks are from a 3.80GHz i7-7700HQ CPU with 16GB ram. The aggregate verification is utilizing parallelization for the pairing operations. The multisignature has parellilization for the two involved pairing operations, and parallelization for the pairing checks at the end. Note, all of the benchmarks need to be updated.
 
-For reference, the pairing operation (the slowest operation involved) takes ~1.6 milliseconds.
+For reference, the pairing operation on Altbn128 (the slowest operation involved) takes ~1.9 milliseconds.
 ```
-BenchmarkG1-8        	   10000	    141018 ns/op
-BenchmarkG2-8        	    3000	    471002 ns/op
-BenchmarkPairing-8   	    1000	   1609893 ns/op
-PASS
-ok  	github.com/ethereum/go-ethereum/crypto/bn256/cloudflare	4.725s
+BenchmarkPairing-8   	    1000	   1958898 ns/op
+```
+and for Bls12 its:
+```
+BenchmarkPairGT-8               	    1000	   1539918 ns/op
 ```
 
 - `Signing` ~.22 milliseconds
@@ -44,8 +48,10 @@ ok  	github.com/ethereum/go-ethereum/crypto/bn256/cloudflare	4.725s
 - `Multi Signature verification` ~2 milliseconds + ~1.1 microseconds per signer, two pairings + n point additions
 - `Aggregate Signature verification` ~.36 milliseconds per signer/message pair, with n+1 pairings run in parallel. (4.45x speedup with 8 cores)
 
+The following benchmarks are done with altbn128, before the product of pairings
+abstraction was included. These need to be updated.
 ```
-$ go test github.com/Project-Arda/bgls/  -v -bench .
+$ go test github.com/Project-Arda/bgls/bgls/  -v -bench .
 BenchmarkKeygen-8                  	    3000	    434484 ns/op
 BenchmarkAltBnHashToCurve-8        	   20000	     91947 ns/op
 BenchmarkSigning-8                 	   10000	    218670 ns/op
@@ -71,21 +77,22 @@ ok  	golang.org/x/crypto/ed25519	5.750s
 ```
 
 ### Hashing
-The hashing algorithm is currently try-and-increment, and we support SHA3, Kangaroo twelve, Keccak256, and Blake2b.
+Currently only hashing to G1 is supported. Hashing to G2 is planned.
+For altbn128, the hashing algorithm is currently try-and-increment, and we support SHA3, Kangaroo twelve, Keccak256, and Blake2b.
 
-We previously used a direct implementation of [Indifferentiable Hashing to Barreto–Naehrig Curves](http://www.di.ens.fr/~fouque/pub/latincrypt12.pdf) using blake2b. This was removed because it can't be implemented in the EVM due to gas costs, and because it will not work for BLS12-381.
+For bls12-381, we are using [Fouque-Tibouchi hashing](http://www.di.ens.fr/~fouque/pub/latincrypt12.pdf) using blake2b. This is interoperable with ebfull's repository.
 
 ## Future work
 - Optimize bigint allocations.
-- Add utility operations for serialization of keys/signatures.
-- Implement a better Hashing algorithm, such as Elligator Squared.
-- Integrate [BLS12-381](https://github.com/ebfull/pairing/tree/master/src/bls12_381) with go bindings.
+- Add hashing to G2
 - Integrations with [bgls-on-evm](https://github.com/jlandrews/bgls-on-evm).
 - Add tests to show that none of the functions mutate data.
 - More complete usage documentation.
 - Add buffering for the channels used in parallelization.
+- Make upstream libraries implement [product of pairings algorithms](https://eprint.iacr.org/2006/172.pdf)
 
 ## References
+- Dan Boneh [Methods to prevent the rogue public key attack](https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html)
 - Dan Boneh, Craig Gentry, Ben Lynn, and Hovav Shacham. [Aggregate and verifiably encrypted signatures from bilinear maps](https://www.iacr.org/archive/eurocrypt2003/26560416/26560416.pdf)
 - Pierre-Alain Fouque and Mehdi Tibouchi. [Indifferentiable Hashing to
 Barreto–Naehrig Curves](http://www.di.ens.fr/~fouque/pub/latincrypt12.pdf)

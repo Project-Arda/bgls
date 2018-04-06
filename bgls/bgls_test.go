@@ -6,6 +6,7 @@ package bgls
 import (
 	"crypto/rand"
 	"math/big"
+	"os"
 	"testing"
 
 	. "github.com/Project-Arda/bgls/curves"
@@ -13,6 +14,7 @@ import (
 )
 
 var curves = []CurveSystem{Altbn128, Bls12}
+var benchmarkCurve = Bls12
 
 func TestSingleSigner(t *testing.T) {
 	for _, curve := range curves {
@@ -134,12 +136,26 @@ var vks []Point
 var sgs []Point
 var msg []byte
 
+func TestMain(m *testing.M) {
+	vks = make([]Point, 2048)
+	sgs = make([]Point, 2048)
+	msg = make([]byte, 64)
+	rand.Read(msg)
+	for i := 0; i < 2048; i++ {
+		sk, vk, _ := KeyGen(benchmarkCurve)
+		vks[i] = vk
+		sgs[i] = KoskSign(benchmarkCurve, sk, msg)
+	}
+	os.Exit(m.Run())
+}
+
 func benchmulti(b *testing.B, k int) {
-	curve := Altbn128
-	multisig := MultiSig{vks[:k], AggregateSignatures(sgs[:k]), msg}
+	//multisig := MultiSig{vks[:k], AggregateSignatures(sgs[:k]), msg}
+	aggsig := AggregateSignatures(sgs[:k])
+	keys := vks[:k]
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if !multisig.Verify(curve) {
+		if !KoskVerifyMultiSignature(benchmarkCurve, aggsig, keys, msg) {
 			b.Error("MultiSig verification failed")
 		}
 	}
@@ -170,20 +186,19 @@ func BenchmarkMultiVerification2048(b *testing.B) {
 }
 
 func BenchmarkAggregateVerification(b *testing.B) {
-	curve := Altbn128
 	verifkeys := make([]Point, b.N)
 	sigs := make([]Point, b.N)
 	messages := make([][]byte, b.N)
 	for i := 0; i < b.N; i++ {
 		messages[i] = make([]byte, 64)
 		rand.Read(messages[i])
-		sk, vk, _ := KeyGen(curve)
+		sk, vk, _ := KeyGen(benchmarkCurve)
 		verifkeys[i] = vk
-		sigs[i] = Sign(curve, sk, messages[i])
+		sigs[i] = Sign(benchmarkCurve, sk, messages[i])
 	}
-	aggsig := AggSig{verifkeys, messages, AggregateSignatures(sigs)}
+	aggsig := AggregateSignatures(sigs)
 	b.ResetTimer()
-	if !aggsig.Verify(curve) {
+	if !VerifyAggregateSignature(benchmarkCurve, aggsig, verifkeys, messages) {
 		b.Error("Aggregate verificaton failed")
 	}
 }
