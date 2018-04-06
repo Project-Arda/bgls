@@ -113,7 +113,7 @@ func sw(curve CurveSystem, t *big.Int, blind bool) (Point, bool) {
 
 	alpha := int64(0)
 	beta := int64(0)
-	i := 0
+	var i int
 
 	for i = 0; i < 3; i++ {
 		if i == 0 {

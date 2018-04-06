@@ -6,7 +6,6 @@ package bgls
 import (
 	"crypto/rand"
 	"math/big"
-	mathrand "math/rand"
 	"testing"
 
 	. "github.com/Project-Arda/bgls/curves"
@@ -19,7 +18,6 @@ func TestSingleSigner(t *testing.T) {
 	for _, curve := range curves {
 		sk, vk, err := KeyGen(curve)
 		assert.Nil(t, err, "Key generation failed")
-		assert.True(t, CheckAuthentication(curve, vk, Authenticate(curve, sk)), "Key Authentication failed")
 		d := make([]byte, 64)
 		_, err = rand.Read(d)
 		assert.Nil(t, err, "test data generation failed")
@@ -62,7 +60,7 @@ func TestAggregation(t *testing.T) {
 		aggSig = AggregatePoints(sigs)
 		assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys, msgs),
 			"Aggregate Signature succeeding with duplicate messages")
-		assert.True(t, VerifyAggregateKoskSignature(curve, aggSig, pubkeys, msgs),
+		assert.True(t, KoskVerifyAggregateSignature(curve, aggSig, pubkeys, msgs),
 			"Aggregate Kosk signature failing with duplicate messages")
 		assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N]),
 			"Aggregate Point1 succeeding with invalid signature")
@@ -73,64 +71,6 @@ func TestAggregation(t *testing.T) {
 			"Aggregate Point1 succeeded with messages 0 and 1 switched")
 
 		// TODO Add tests to make sure there is no mutation
-	}
-}
-
-func TestMultiSig(t *testing.T) {
-	for _, curve := range curves {
-		Tests, Size, Signers := 5, 32, 10
-		for i := 0; i < Tests; i++ {
-			msg := make([]byte, Size)
-			rand.Read(msg)
-			signers := make([]Point, Signers)
-			sigs := make([]Point, Signers)
-			for j := 0; j < Signers; j++ {
-				sk, vk, _ := KeyGen(curve)
-				sigs[j] = Sign(curve, sk, msg)
-				signers[j] = vk
-			}
-			aggSig := AggregatePoints(sigs)
-			assert.True(t, VerifyMultiSignature(curve, aggSig, signers, msg),
-				"Aggregate MultiSig verification failed")
-			msg2 := make([]byte, Size)
-			rand.Read(msg2)
-			assert.False(t, VerifyMultiSignature(curve, aggSig, signers, msg2),
-				"Aggregate MultiSig verification succeeded on incorrect msg")
-			_, vkf, _ := KeyGen(curve)
-			signers[0] = vkf
-			assert.False(t, VerifyMultiSignature(curve, aggSig, signers, msg),
-				"Aggregate MultiSig verification succeeded on incorrect signers")
-		}
-	}
-}
-
-func TestMultiSigWithMultiplicity(t *testing.T) {
-	for _, curve := range curves {
-		Tests, Size, Signers := 5, 32, 10
-		for i := 0; i < Tests; i++ {
-			msg := make([]byte, Size)
-			rand.Read(msg)
-			signers := make([]Point, Signers)
-			sigs := make([]Point, Signers)
-			multi := make([]int64, Signers)
-			for j := 0; j < Signers; j++ {
-				sk, vk, _ := KeyGen(curve)
-				multi[j] = mathrand.Int63()
-				sigs[j] = Sign(curve, sk, msg).Mul(big.NewInt(multi[j]))
-				signers[j] = vk
-			}
-			aggSig := AggregatePoints(sigs)
-			assert.True(t, VerifyMultiSignatureWithMultiplicity(curve, aggSig, signers, multi, msg),
-				"Aggregate MultiSig verification failed")
-			msg2 := make([]byte, Size)
-			rand.Read(msg2)
-			assert.False(t, VerifyMultiSignatureWithMultiplicity(curve, aggSig, signers, multi, msg2),
-				"Aggregate MultiSig verification succeeded on incorrect msg")
-			_, vkf, _ := KeyGen(curve)
-			signers[0] = vkf
-			assert.False(t, VerifyMultiSignatureWithMultiplicity(curve, aggSig, signers, multi, msg),
-				"Aggregate MultiSig verification succeeded on incorrect signers")
-		}
 	}
 }
 

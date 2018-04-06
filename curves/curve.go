@@ -15,7 +15,6 @@ type CurveSystem interface {
 	MakeG1Point([]*big.Int, bool) (Point, bool)
 	MakeG2Point([]*big.Int, bool) (Point, bool)
 
-	//
 	// GTToAffineCoords(PointT) (*big.Int, *big.Int)
 
 	UnmarshalG1([]byte) (Point, bool)
@@ -123,6 +122,8 @@ type indexedPoint struct {
 	pt    Point
 }
 
+// ScalePoints takes a set of points, and a set of multiples, and returns a
+// new set of points multiplied by the corresponding factor.
 func ScalePoints(pts []Point, factors []*big.Int) (newKeys []Point) {
 	if factors == nil {
 		return pts

@@ -7,7 +7,7 @@ import (
 	"crypto/rand"
 	"math/big"
 
-	. "github.com/Project-Arda/bgls/curves"
+	. "github.com/Project-Arda/bgls/curves" // nolint: golint
 )
 
 //MultiSig holds set of keys and one message plus signature
@@ -40,26 +40,28 @@ func LoadPublicKey(curve CurveSystem, sk *big.Int) Point {
 	return pubKey
 }
 
-//Sign creates a signature on a message with a private key
-func Sign(curve CurveSystem, sk *big.Int, m []byte) Point {
-	return SignCustHash(sk, m, curve.HashToG1)
+// Sign creates a standard BLS signature on a message with a private key
+func Sign(curve CurveSystem, sk *big.Int, msg []byte) Point {
+	return SignCustHash(sk, msg, curve.HashToG1)
 }
 
-// SignCustHash creates a signature on a message with a private key, using
-// a supplied function to hash to g1.
-func SignCustHash(sk *big.Int, m []byte, hash func([]byte) Point) Point {
-	h := hash(m)
+// SignCustHash creates a standard BLS signature on a message with a private key,
+// using a supplied function to hash onto the curve where signatures lie.
+func SignCustHash(sk *big.Int, msg []byte, hash func([]byte) Point) Point {
+	h := hash(msg)
 	i := h.Mul(sk)
 	return i
 }
 
-// VerifySingleSignature checks that a signature is valid
-func VerifySingleSignature(curve CurveSystem, pubKey Point, m []byte, sig Point) bool {
-	return VerifySingleSignatureCustHash(curve, pubKey, m, sig, curve.HashToG1)
+// VerifySingleSignature checks that a single standard BLS signature is valid
+func VerifySingleSignature(curve CurveSystem, pubKey Point, msg []byte, sig Point) bool {
+	return VerifySingleSignatureCustHash(curve, pubKey, msg, sig, curve.HashToG1)
 }
 
-// VerifySingleSignatureCustHash checks that a signature is valid with the supplied hash function
-func VerifySingleSignatureCustHash(curve CurveSystem, pubKey Point, msg []byte, sig Point, hash func([]byte) Point) bool {
+// VerifySingleSignatureCustHash checks that a single standard BLS signature is
+// valid, using the supplied hash function to hash onto the curve where signatures lie.
+func VerifySingleSignatureCustHash(curve CurveSystem, pubKey Point, msg []byte,
+	sig Point, hash func([]byte) Point) bool {
 	c := make(chan PointT)
 	go concurrentPair(curve, sig, curve.GetG2(), c)
 	go concurrentMsgPair(curve, msg, pubKey, c)
@@ -68,17 +70,26 @@ func VerifySingleSignatureCustHash(curve CurveSystem, pubKey Point, msg []byte, 
 	return e1.Equals(e2)
 }
 
+// Verify verifies an aggregate signature type.
 func (a *AggSig) Verify(curve CurveSystem) bool {
 	return VerifyAggregateSignature(curve, a.sig, a.keys, a.msgs)
 }
 
-// VerifyAggregateSignature verifies that the aggregated signature proves that all messages were signed by associated keys
-// Will fail if there are duplicate messages, due to the possibility of the rogue public-key attack.
-// If duplicate messages should be allowed, one of the protections against the rogue public-key attack should be used
-// such as Knowledge of Secret Key (Kosk), enforcing distinct messages, or the method discussed
-// here <https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html>
+// VerifyAggregateSignature verifies that the aggregated signature proves that
+// all messages were signed by the associated keys. This will fail if there are
+// duplicate messages, due to the possibility of the rogue public-key attack.
+// If duplicate messages should be allowed, one of the protections against the
+// rogue public-key attack should be used. See doc.go for more details.
 func VerifyAggregateSignature(curve CurveSystem, aggsig Point, keys []Point, msgs [][]byte) bool {
 	return verifyAggSig(curve, aggsig, keys, msgs, false)
+}
+
+// verifyMultiSignature checks that the aggregate signature correctly proves
+// that a single message has been signed by a set of keys. This is
+// vulnerable to the rogue public attack, so one of the defense mechanisms should be used.
+func verifyMultiSignature(curve CurveSystem, aggsig Point, keys []Point, msg []byte) bool {
+	vs := AggregatePoints(keys)
+	return VerifySingleSignature(curve, vs, msg, aggsig)
 }
 
 func verifyAggSig(curve CurveSystem, aggsig Point, keys []Point, msgs [][]byte, allowDuplicates bool) bool {
@@ -103,6 +114,16 @@ func verifyAggSig(curve CurveSystem, aggsig Point, keys []Point, msgs [][]byte, 
 		e2, _ = e2.Add(e3)
 	}
 	return e1.Equals(e2)
+}
+
+// AggregateSignatures aggregates an array of signatures into one aggsig.
+func AggregateSignatures(sigs []Point) Point {
+	return AggregatePoints(sigs)
+}
+
+// AggregateKeys sums an array of public keys into one key.
+func AggregateKeys(keys []Point) Point {
+	return AggregatePoints(keys)
 }
 
 // concurrentPair pairs pt with key, and sends the result down the channel.
