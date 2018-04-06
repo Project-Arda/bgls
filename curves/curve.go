@@ -27,6 +27,7 @@ type CurveSystem interface {
 
 	GetG1Infinity() Point
 	GetG2Infinity() Point
+	GetGTIdentity() PointT
 
 	HashToG1(message []byte) Point
 
@@ -43,6 +44,8 @@ type CurveSystem interface {
 	g1XToYSquared(*big.Int) *big.Int
 
 	Pair(Point, Point) (PointT, bool)
+	// Product of Pairings
+	PairingProduct([]Point, []Point) (PointT, bool)
 }
 
 // Point is a way to represent a point on G1 or G2, in the first two elliptic curves.
@@ -69,27 +72,26 @@ type PointT interface {
 // AggregatePoints takes the sum of points.
 func AggregatePoints(points []Point) Point {
 	if len(points) == 2 { // No parallelization needed
-		aggG2, _ := points[0].Add(points[1])
-		return aggG2
+		aggPoint, _ := points[0].Add(points[1])
+		return aggPoint
 	}
 	// Aggregate all the points together using concurrency
 	c := make(chan Point)
-	aggPoint := make([]Point, (len(points)/2)+(len(points)%2))
-	counter := 0
 
 	// Initialize aggPoint to an array with elements being the sum of two
 	// adjacent Points.
+	counter := 0
 	for i := 0; i < len(points); i += 2 {
 		go concurrentAggregatePoints(i, points, c)
 		counter++
 	}
+	aggPoint := make([]Point, counter)
 	for i := 0; i < counter; i++ {
 		aggPoint[i] = <-c
 	}
 
 	// Keep on aggregating every pair of points until only one aggregate point remains
 	for {
-		nxtAggPoint := make([]Point, (len(aggPoint)/2)+(len(aggPoint)%2))
 		counter = 0
 		if len(aggPoint) == 1 {
 			break
@@ -98,6 +100,7 @@ func AggregatePoints(points []Point) Point {
 			go concurrentAggregatePoints(i, aggPoint, c)
 			counter++
 		}
+		nxtAggPoint := make([]Point, counter)
 		for i := 0; i < counter; i++ {
 			nxtAggPoint[i] = <-c
 		}
@@ -109,6 +112,66 @@ func AggregatePoints(points []Point) Point {
 // concurrentAggregatePoints handles the channel for concurrent Aggregation of points.
 // It only adds the element at points[start] and points[start + 1], and sends it through the channel
 func concurrentAggregatePoints(start int, points []Point, c chan Point) {
+	if start+1 >= len(points) {
+		c <- points[start]
+		return
+	}
+	summed, _ := points[start].Add(points[start+1])
+	c <- summed
+}
+
+// concurrentPairingProduct computes a set of pairings in parallel,
+// and then takes their product again using concurrency.
+func concurrentPairingProduct(curve CurveSystem, points1 []Point, points2 []Point) (PointT, bool) {
+	if len(points1) != len(points2) {
+		return nil, false
+	}
+	// Compute all the pairings in parallel
+	c := make(chan PointT)
+	pairedPoints := make([]PointT, len(points1))
+	for i := 0; i < len(pairedPoints); i++ {
+		go concurrentPair(curve, points1[i], points2[i], c)
+	}
+	for i := 0; i < len(pairedPoints); i++ {
+		pairedPoints[i] = <-c
+		if pairedPoints[i] == nil {
+			return nil, false
+		}
+	}
+	counter := 0
+	// Set aggPairedPoints to an array with elements being the sum of two
+	// adjacent Points.
+	for i := 0; i < len(pairedPoints); i += 2 {
+		go concurrentAggregatePointTs(i, pairedPoints, c)
+		counter++
+	}
+	aggPairedPoints := make([]PointT, counter)
+	for i := 0; i < counter; i++ {
+		aggPairedPoints[i] = <-c
+	}
+
+	// Keep on aggregating every pair of points until only one aggregate point remains
+	for {
+		counter = 0
+		if len(aggPairedPoints) == 1 {
+			break
+		}
+		for i := 0; i < len(aggPairedPoints); i += 2 {
+			go concurrentAggregatePointTs(i, aggPairedPoints, c)
+			counter++
+		}
+		nxtPairedPoints := make([]PointT, counter)
+		for i := 0; i < counter; i++ {
+			nxtPairedPoints[i] = <-c
+		}
+		aggPairedPoints = nxtPairedPoints
+	}
+	return aggPairedPoints[0], true
+}
+
+// concurrentAggregatePoints handles the channel for concurrent Aggregation of points.
+// It only adds the element at points[start] and points[start + 1], and sends it through the channel
+func concurrentAggregatePointTs(start int, points []PointT, c chan PointT) {
 	if start+1 >= len(points) {
 		c <- points[start]
 		return
@@ -148,4 +211,13 @@ func concurrentScale(key Point, factor *big.Int, index int, c chan *indexedPoint
 	} else {
 		c <- &indexedPoint{index, key.Mul(factor)}
 	}
+}
+
+// concurrentPair pairs pt with key, and sends the result down the channel.
+func concurrentPair(curve CurveSystem, pt1 Point, pt2 Point, c chan PointT) {
+	if targetPoint, ok := curve.Pair(pt1, pt2); ok {
+		c <- targetPoint
+		return
+	}
+	c <- nil
 }

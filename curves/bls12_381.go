@@ -124,12 +124,24 @@ func (pt *bls12Point2) MarshalUncompressed() []byte {
 }
 
 func (pt *bls12Point2) Mul(scalar *big.Int) Point {
-	if scalar.Cmp(zero) == 0 {
+	prod, _ := pt.Copy().(*bls12Point2)
+	cmp := scalar.Cmp(zero)
+	if cmp < 0 {
+		prod = prod.Negate()
+		scalar.Mul(scalar, big.NewInt(-1))
+	} else if cmp == 0 {
 		return Bls12.GetG2Infinity()
 	}
-	prod, _ := pt.Copy().(*bls12Point2)
 	prod.point.ScalarMult(new(bls12.Scalar).FromInt(scalar))
 	return prod
+}
+
+func (pt *bls12Point2) Negate() *bls12Point2 {
+	coords := pt.ToAffineCoords()
+	coords[2].Sub(bls12Q, coords[2])
+	coords[3].Sub(bls12Q, coords[3])
+	newPt, _ := Bls12.MakeG2Point(coords, false)
+	return newPt.(*bls12Point2)
 }
 
 // ToAffineCoords returns the affine coordinate representation of the point
@@ -223,6 +235,10 @@ func (curve *bls12Curve) Pair(pt1 Point, pt2 Point) (PointT, bool) {
 	return nil, false
 }
 
+func (curve *bls12Curve) PairingProduct(pts1 []Point, pts2 []Point) (PointT, bool) {
+	return concurrentPairingProduct(curve, pts1, pts2)
+}
+
 func (curve *bls12Curve) UnmarshalG1(data []byte) (Point, bool) {
 	if len(data) != 48 && len(data) != 96 {
 		return nil, false
@@ -276,6 +292,10 @@ func (curve *bls12Curve) GetG2Infinity() Point {
 	return &bls12Point2{bls12.G2Zero()}
 }
 
+func (curve *bls12Curve) GetGTIdentity() PointT {
+	return bls12GTIdentity
+}
+
 func (curve *bls12Curve) getG1A() *big.Int {
 	return zero
 }
@@ -318,6 +338,7 @@ var bls12SwencSqrtNegThree, _ = new(big.Int).SetString("158695878145843102524275
 var bls12Cofactor, _ = new(big.Int).SetString("76329603384216526031706109802092473003", 10)
 var bls12Order, _ = new(big.Int).SetString("52435875175126190479447740508185965837690552500527637822603658699938581184513", 10)
 var bls12GT, _ = Bls12.Pair(Bls12.GetG1(), Bls12.GetG2())
+var bls12GTIdentity, _ = Bls12.Pair(Bls12.GetG1Infinity(), Bls12.GetG2())
 var bls12G1Tag1 = []byte("G1_0")
 var bls12G1Tag2 = []byte("G1_1")
 
