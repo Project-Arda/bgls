@@ -18,16 +18,15 @@ func TestKoskSingleSigner(t *testing.T) {
 		sk, vk, err := KeyGen(curve)
 		assert.Nil(t, err, "Key generation failed")
 		assert.True(t, CheckAuthentication(curve, vk, Authenticate(curve, sk)), "Key Authentication failed")
-		d := make([]byte, 64)
-		_, err = rand.Read(d)
+		msg := make([]byte, 64)
+		_, err = rand.Read(msg)
 		assert.Nil(t, err, "test data generation failed")
-		sig := KoskSign(curve, sk, d)
-		assert.True(t, KoskVerifySingleSignature(curve, vk, d, sig), "Point1 verification failed")
+		sig := KoskSign(curve, sk, msg)
+		assert.True(t, KoskVerifySingleSignature(curve, sig, vk, msg), "Kosk signature verification failed")
 
-		sigTmp := sig.Copy()
-		sigTmp, _ = sigTmp.Add(curve.GetG1())
-		sig2 := sigTmp
-		assert.False(t, KoskVerifySingleSignature(curve, vk, d, sig2), "Point1 verification succeeding when it shouldn't")
+		sig2 := sig.Copy()
+		sig2, _ = sig2.Add(curve.GetG1())
+		assert.False(t, KoskVerifySingleSignature(curve, sig2, vk, msg), "Kosk signature succeeding when it shouldn't")
 
 		// TODO Add tests to show that this doesn't succeed if d or vk is altered
 	}
@@ -46,16 +45,19 @@ func TestKoskMultiSig(t *testing.T) {
 				sigs[j] = KoskSign(curve, sk, msg)
 				signers[j] = vk
 			}
-			aggSig := AggregatePoints(sigs)
-			assert.True(t, KoskVerifyMultiSignature(curve, aggSig, signers, msg),
+			aggsig := AggregateSignatures(sigs)
+			assert.True(t, KoskVerifyMultiSignature(curve, aggsig, signers, msg),
 				"Aggregate MultiSig verification failed")
 			msg2 := make([]byte, Size)
 			rand.Read(msg2)
-			assert.False(t, KoskVerifyMultiSignature(curve, aggSig, signers, msg2),
+			assert.False(t, KoskVerifyMultiSignature(curve, aggsig, signers, msg2),
 				"Aggregate MultiSig verification succeeded on incorrect msg")
 			_, vkf, _ := KeyGen(curve)
+			aggkey := AggregateKeys(signers)
+			assert.True(t, KoskVerifySingleSignature(curve, aggsig, aggkey, msg),
+				"Aggregate MultiSig verification failed with the aggkey pre-aggregated")
 			signers[0] = vkf
-			assert.False(t, KoskVerifyMultiSignature(curve, aggSig, signers, msg),
+			assert.False(t, KoskVerifyMultiSignature(curve, aggsig, signers, msg),
 				"Aggregate MultiSig verification succeeded on incorrect signers")
 		}
 	}

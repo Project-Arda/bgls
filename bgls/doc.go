@@ -2,7 +2,14 @@
 // distributed under Apache 2.0 license
 
 // Package bgls implements bls signatures, as described by
-// Short Signatures from the Weil Pairing. There are three different
+// Short Signatures from the Weil Pairing. In this library, an aggregate signature
+// refers to an aggregation of signatures on different messages into a single signature.
+// A multi signature refers to an aggregation of signatures on the same message
+// into the same signature. The difference is that a multi signature can be
+// verified quite quickly, using 2 pairing operations regardless of the number
+// of signers, whereas an aggregate signature requires n+1 pairing operations.
+//
+// There are three different
 // methods to protect against the rogue public key attack. The three methods are
 // proving knowledge of secret key (kosk), enforcing that all messages are distinct
 // (Distinct Message), and using a hash of the public keys to create exponents

@@ -34,9 +34,9 @@ func DistinctMsgSignCustHash(curve CurveSystem, sk *big.Int, msg []byte, hash fu
 }
 
 // DistinctMsgVerifySingleSignature checks that a single 'Distinct Message' signature is valid
-func DistinctMsgVerifySingleSignature(curve CurveSystem, pubkey Point, m []byte, sig Point) bool {
+func DistinctMsgVerifySingleSignature(curve CurveSystem, sig Point, pubkey Point, m []byte) bool {
 	msg := append(pubkey.MarshalUncompressed(), m...)
-	return VerifySingleSignature(curve, pubkey, msg, sig)
+	return VerifySingleSignature(curve, sig, pubkey, msg)
 }
 
 // DistinctMsgVerifyAggregateSignature checks that an aggsig was generated from the

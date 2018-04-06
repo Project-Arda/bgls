@@ -55,14 +55,14 @@ func SignCustHash(sk *big.Int, msg []byte, hash func([]byte) Point) Point {
 }
 
 // VerifySingleSignature checks that a single standard BLS signature is valid
-func VerifySingleSignature(curve CurveSystem, pubKey Point, msg []byte, sig Point) bool {
-	return VerifySingleSignatureCustHash(curve, pubKey, msg, sig, curve.HashToG1)
+func VerifySingleSignature(curve CurveSystem, sig Point, pubKey Point, msg []byte) bool {
+	return VerifySingleSignatureCustHash(curve, sig, pubKey, msg, curve.HashToG1)
 }
 
 // VerifySingleSignatureCustHash checks that a single standard BLS signature is
 // valid, using the supplied hash function to hash onto the curve where signatures lie.
-func VerifySingleSignatureCustHash(curve CurveSystem, pubkey Point, msg []byte,
-	sig Point, hash func([]byte) Point) bool {
+func VerifySingleSignatureCustHash(curve CurveSystem, sig Point, pubkey Point,
+	msg []byte, hash func([]byte) Point) bool {
 	h := hash(msg).Mul(new(big.Int).SetInt64(-1))
 	paired, _ := curve.PairingProduct([]Point{h, sig}, []Point{pubkey, curve.GetG2()})
 	return curve.GetGTIdentity().Equals(paired)
@@ -87,7 +87,7 @@ func VerifyAggregateSignature(curve CurveSystem, aggsig Point, keys []Point, msg
 // vulnerable to the rogue public attack, so one of the defense mechanisms should be used.
 func verifyMultiSignature(curve CurveSystem, aggsig Point, keys []Point, msg []byte) bool {
 	vs := AggregatePoints(keys)
-	return VerifySingleSignature(curve, vs, msg, aggsig)
+	return VerifySingleSignature(curve, aggsig, vs, msg)
 }
 
 func verifyAggSig(curve CurveSystem, aggsig Point, keys []Point, msgs [][]byte, allowDuplicates bool) bool {
@@ -118,19 +118,15 @@ func verifyAggSig(curve CurveSystem, aggsig Point, keys []Point, msgs [][]byte, 
 }
 
 // AggregateSignatures aggregates an array of signatures into one aggsig.
+// This wrapper only exists so end-users don't have to use the method from curves
 func AggregateSignatures(sigs []Point) Point {
 	return AggregatePoints(sigs)
 }
 
 // AggregateKeys sums an array of public keys into one key.
+// This wrapper only exists so end-users don't have to use the method from curve
 func AggregateKeys(keys []Point) Point {
 	return AggregatePoints(keys)
-}
-
-// concurrentPair pairs pt with key, and sends the result down the channel.
-func concurrentPair(curve CurveSystem, pt Point, key Point, c chan PointT) {
-	targetPoint, _ := curve.Pair(pt, key)
-	c <- targetPoint
 }
 
 // concurrentHash hashes the message and sends the result down the channel.
