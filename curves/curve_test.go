@@ -132,6 +132,34 @@ func TestMul(t *testing.T) {
 			pt2 := curve.GetG1().Mul(scalarNeg)
 			inf, _ := pt1.Add(pt2)
 			assert.True(t, inf.Equals(curve.GetG1Infinity()))
+			pt1 = curve.GetG2().Mul(scalar)
+			pt2 = curve.GetG2().Mul(scalarNeg)
+			inf, _ = pt1.Add(pt2)
+			assert.True(t, inf.Equals(curve.GetG2Infinity()))
+		}
+	}
+}
+
+func TestPairingProd(t *testing.T) {
+	// TODO: Make upstream libraries include proper product of pairing functionality
+	for _, curve := range curves {
+		numTests := 5
+		for i := 0; i < numTests; i++ {
+			numPoints := 5
+			points1 := make([]Point, numPoints)
+			points2 := make([]Point, numPoints)
+			prod := curve.GetGTIdentity()
+			for j := 0; j < numPoints; j++ {
+				g1Scalar, _ := rand.Int(rand.Reader, curve.GetG1Order())
+				g2Scalar, _ := rand.Int(rand.Reader, curve.GetG1Order())
+
+				points1[j] = curve.GetG1().Mul(g1Scalar)
+				points2[j] = curve.GetG2().Mul(g2Scalar)
+				pair, _ := curve.Pair(points1[j], points2[j])
+				prod, _ = prod.Add(pair)
+			}
+			pairCheck, _ := curve.PairingProduct(points1, points2)
+			assert.True(t, pairCheck.Equals(prod))
 		}
 	}
 }

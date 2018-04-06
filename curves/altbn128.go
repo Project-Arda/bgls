@@ -105,14 +105,17 @@ func pad32Bytes(xBytes []byte) []byte {
 }
 
 func (g1Point *altbn128Point1) Mul(scalar *big.Int) Point {
+	scalar2 := new(big.Int)
 	cmp := scalar.Cmp(zero)
 	if cmp < 0 {
 		g1Point = g1Point.Negate()
-		scalar.Mul(scalar, big.NewInt(-1))
+		scalar2.Mul(scalar, big.NewInt(-1))
 	} else if cmp == 0 {
 		return Altbn128.GetG1Infinity()
+	} else {
+		scalar2 = scalar
 	}
-	prod := new(bn256.G1).ScalarMult(g1Point.point, scalar)
+	prod := new(bn256.G1).ScalarMult(g1Point.point, scalar2)
 	ret := &altbn128Point1{prod}
 	return ret
 }
@@ -135,6 +138,10 @@ func (curve *altbn128) Pair(g1Point Point, g2Point Point) (PointT, bool) {
 		return ret, true
 	}
 	return nil, false
+}
+
+func (curve *altbn128) PairingProduct(g1Points []Point, g2Points []Point) (PointT, bool) {
+	return concurrentPairingProduct(curve, g1Points, g2Points)
 }
 
 // ToAffineCoords returns the affine coordinate representation of the point
@@ -217,8 +224,26 @@ func (g2Point *altbn128Point2) MarshalUncompressed() []byte {
 	return g2Point.point.Marshal()
 }
 
+func (g2Point *altbn128Point2) Negate() *altbn128Point2 {
+	coords := g2Point.ToAffineCoords()
+	coords[2].Sub(altbnG1Q, coords[2])
+	coords[3].Sub(altbnG1Q, coords[3])
+	newPt, _ := Altbn128.MakeG2Point(coords, false)
+	return newPt.(*altbn128Point2)
+}
+
 func (g2Point *altbn128Point2) Mul(scalar *big.Int) Point {
-	prod := new(bn256.G2).ScalarMult(g2Point.point, scalar)
+	scalar2 := new(big.Int)
+	cmp := scalar.Cmp(zero)
+	if cmp < 0 {
+		g2Point = g2Point.Negate()
+		scalar2.Mul(scalar, big.NewInt(-1))
+	} else if cmp == 0 {
+		return Altbn128.GetG2Infinity()
+	} else {
+		scalar2 = scalar
+	}
+	prod := new(bn256.G2).ScalarMult(g2Point.point, scalar2)
 	ret := &altbn128Point2{prod}
 	return ret
 }
@@ -409,7 +434,12 @@ func (curve *altbn128) GetG1Infinity() (pt Point) {
 }
 
 func (curve *altbn128) GetG2Infinity() Point {
-	return curve.GetG2().Mul(new(big.Int).SetInt64(0))
+	pt, _ := curve.MakeG2Point([]*big.Int{zero, zero, zero, zero}, false)
+	return pt
+}
+
+func (curve *altbn128) GetGTIdentity() PointT {
+	return altbnGTIdentity
 }
 
 func (curve *altbn128) GetGT() PointT {
@@ -442,6 +472,10 @@ var altbnSqrtn3, _ = new(big.Int).SetString("44079209702962438428372074856515240
 var altbnG1 = &altbn128Point1{new(bn256.G1).ScalarBaseMult(one)}
 var altbnG2 = &altbn128Point2{new(bn256.G2).ScalarBaseMult(one)}
 var altbnGT, _ = Altbn128.Pair(altbnG1, altbnG2)
+
+// Ensure zero has been created
+var z = zero
+var altbnGTIdentity, _ = Altbn128.Pair(Altbn128.GetG1(), Altbn128.GetG2Infinity())
 
 var altbnG1Order, _ = new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
 

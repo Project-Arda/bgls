@@ -6,6 +6,7 @@ package bgls
 import (
 	"crypto/rand"
 	"math/big"
+	"sync"
 
 	. "github.com/Project-Arda/bgls/curves" // nolint: golint
 )
@@ -60,14 +61,11 @@ func VerifySingleSignature(curve CurveSystem, pubKey Point, msg []byte, sig Poin
 
 // VerifySingleSignatureCustHash checks that a single standard BLS signature is
 // valid, using the supplied hash function to hash onto the curve where signatures lie.
-func VerifySingleSignatureCustHash(curve CurveSystem, pubKey Point, msg []byte,
+func VerifySingleSignatureCustHash(curve CurveSystem, pubkey Point, msg []byte,
 	sig Point, hash func([]byte) Point) bool {
-	c := make(chan PointT)
-	go concurrentPair(curve, sig, curve.GetG2(), c)
-	go concurrentMsgPair(curve, msg, pubKey, c)
-	e1 := <-c
-	e2 := <-c
-	return e1.Equals(e2)
+	h := hash(msg).Mul(new(big.Int).SetInt64(-1))
+	paired, _ := curve.PairingProduct([]Point{h, sig}, []Point{pubkey, curve.GetG2()})
+	return curve.GetGTIdentity().Equals(paired)
 }
 
 // Verify verifies an aggregate signature type.
@@ -101,19 +99,22 @@ func verifyAggSig(curve CurveSystem, aggsig Point, keys []Point, msgs [][]byte, 
 			return false
 		}
 	}
-	c := make(chan PointT)
-	c2 := make(chan PointT)
-	go concurrentPair(curve, aggsig, curve.GetG2(), c2)
+	pts1 := make([]Point, len(keys)+1)
+	pts2 := make([]Point, len(keys)+1)
+	var wg sync.WaitGroup
+	wg.Add(len(msgs))
 	for i := 0; i < len(msgs); i++ {
-		go concurrentMsgPair(curve, msgs[i], keys[i], c)
+		go concurrentHash(curve, i, pts1, msgs[i], &wg)
+		pts2[i] = keys[i]
 	}
-	e1 := <-c2
-	e2 := <-c
-	for i := 1; i < len(msgs); i++ {
-		e3 := <-c
-		e2, _ = e2.Add(e3)
+	wg.Wait()
+	pts1[len(keys)] = aggsig.Mul(new(big.Int).SetInt64(-1))
+	pts2[len(keys)] = curve.GetG2()
+	aggPt, ok := curve.PairingProduct(pts1, pts2)
+	if ok {
+		return aggPt.Equals(curve.GetGTIdentity())
 	}
-	return e1.Equals(e2)
+	return ok
 }
 
 // AggregateSignatures aggregates an array of signatures into one aggsig.
@@ -132,10 +133,10 @@ func concurrentPair(curve CurveSystem, pt Point, key Point, c chan PointT) {
 	c <- targetPoint
 }
 
-// concurrentMsgPair hashes the message, pairs it with key, and sends the result down the channel.
-func concurrentMsgPair(curve CurveSystem, msg []byte, key Point, c chan PointT) {
-	h := curve.HashToG1(msg)
-	concurrentPair(curve, h, key, c)
+// concurrentHash hashes the message and sends the result down the channel.
+func concurrentHash(curve CurveSystem, i int, pts []Point, msg []byte, wg *sync.WaitGroup) {
+	pts[i] = curve.HashToG1(msg)
+	wg.Done()
 }
 
 func containsDuplicateMessage(msgs [][]byte) bool {
