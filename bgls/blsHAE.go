@@ -3,26 +3,34 @@
 
 package bgls
 
+// BLS with hashed aggregation exponents(HAE). This is normal bls, but when aggregating
+// you hash the `n` public keys to get `n` numbers in the range [0,2^(128)).
+// Call these numbers t_0, t_1, ... t_{n-1}. Then you scale the ith signature to the
+// by t_i, before multiplying them together.
+//
+// For Verification, you hash to obtain the same t_0, t_1, ... t_{n-1}, and scale
+// the public keys accordingly. Then BLS proceeds as normal with these scaled public keys.
+//
+// The hash function from G^n \to \R^n is blake2x. The uncompressed marshal of every
+// key is written to then blake2x instance. Then n 16 byte numbers are read from the XOF,
+// each corresponding to a value of t.
+//
+// Note. I am calling this Hashed Aggregation Exponents in lieu of a better name
+// for this defense against the rogue public key attack. This method is discussed
+// with a corresponding security proof here:
+// https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html#mjx-eqn-eqforge1
+//
+// If you are using HAE to secure against the rogue public key attack, you are
+// intended to use: KeyGen, Sign, VerifySingleSignature, AggregateSignaturesWithHAE,
+// VerifyMultiSignatureWithHAE, VerifyAggregateSignatureWithHAE
+
 import (
 	"math/big"
 
 	"golang.org/x/crypto/blake2b"
 
-	. "github.com/Project-Arda/bgls/curves"
+	. "github.com/Project-Arda/bgls/curves" // nolint: golint
 )
-
-// BLS with hashed aggregation exponents(HAE). This is normal bls, but when aggregating
-// you hash the `n` public keys to get `n` numbers in the range [0,2^(128)).
-// Call these numbers t_0, t_1, ... t_{n-1}. Then you scale the ith signature to the
-// by t_i, before multiplying them together.
-
-// For Verification, you rehash to get t_0, t_1, ... t_{n-1}, and scale the public keys
-// by this. Then BLS proceeds as normal with these scaled public keys.
-
-// Note. I am calling this Hashed Aggregation Exponents in lieu of a better name
-// for this defense against the rogue public key attack. This method is discussed
-// with a corresponding security proof here:
-// https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html#mjx-eqn-eqforge1
 
 // AggregateSignaturesWithHAE aggregates the signatures, using the
 // hashed exponents derived from the pubkeys to protect against the rogue
@@ -47,7 +55,7 @@ func VerifyAggregateSignatureWithHAE(curve CurveSystem, aggsig Point, pubkeys []
 func VerifyMultiSignatureWithHAE(curve CurveSystem, aggsig Point, pubkeys []Point, msg []byte) bool {
 	t := hashPubKeysToExponents(pubkeys)
 	newkeys := ScalePoints(pubkeys, t)
-	return VerifyMultiSignature(curve, aggsig, newkeys, msg)
+	return verifyMultiSignature(curve, aggsig, newkeys, msg)
 }
 
 // My hash from G^n \to \R^n is using blake2x. The inputs to the hash are the

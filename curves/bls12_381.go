@@ -52,6 +52,7 @@ func (pt *bls12Point1) Equals(otherPt Point) bool {
 	return false
 }
 
+// TODO Make this match ebfull/pairing marshalling.
 func (pt *bls12Point1) Marshal() []byte {
 	return pt.point.Marshal()
 }
@@ -112,6 +113,7 @@ func (pt *bls12Point2) Equals(otherPt Point) bool {
 	return false
 }
 
+// TODO Make this match ebfull/pairing marshalling.
 func (pt *bls12Point2) Marshal() []byte {
 	return pt.point.Marshal()
 }

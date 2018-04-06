@@ -3,37 +3,46 @@
 
 package bgls
 
+// This file implements the method of using Distinct Messages for aggregate signatures.
+// This ensures that no two messages are used from separate pubkeys by prepending
+// the public key before the message, thereby preventing the rogue public key
+// attack.
+//
+// If you are using DistinctMsg to secure against the rogue public key attack, you are
+// intended to use: AggregateSignatures, KeyGen, DistinctMsgSign,
+// DistinctMsgVerifySingleSignature, DistinctMsgVerifyAggregateSignature
+
 import (
 	"math/big"
 
-	. "github.com/Project-Arda/bgls/curves"
+	. "github.com/Project-Arda/bgls/curves" // nolint: golint
 )
 
-// This implements the method of using Distinct Messages for aggregate signatures.
-// This ensures that no two messages are used from separate pubkeys by prepending
-// the public key before the message.
-
-//Sign creates a signature on a message with a private key
-func SignDistinctMsg(curve CurveSystem, sk *big.Int, m []byte) Point {
-	return SignDistinctMsgCustHash(curve, sk, m, curve.HashToG1)
+// DistinctMsgSign creates a signature on a message with a private key, with
+// prepending the public key to the message.
+func DistinctMsgSign(curve CurveSystem, sk *big.Int, m []byte) Point {
+	return DistinctMsgSignCustHash(curve, sk, m, curve.HashToG1)
 }
 
-// SignCustHash creates a signature on a message with a private key, using
+// DistinctMsgSignCustHash creates a signature on a message with a private key, using
 // a supplied function to hash to g1.
-func SignDistinctMsgCustHash(curve CurveSystem, sk *big.Int, m []byte, hash func([]byte) Point) Point {
-	msg := append(LoadPublicKey(curve, sk).MarshalUncompressed(), m...)
-	h := hash(msg)
+func DistinctMsgSignCustHash(curve CurveSystem, sk *big.Int, msg []byte, hash func([]byte) Point) Point {
+	m := append(LoadPublicKey(curve, sk).MarshalUncompressed(), msg...)
+	h := hash(m)
 	i := h.Mul(sk)
 	return i
 }
 
-// VerifyDistinctMsg checks that a single 'Distinct Message' signature is valid
-func VerifyDistinctMsg(curve CurveSystem, pubKey Point, m []byte, sig Point) bool {
-	msg := append(pubKey.MarshalUncompressed(), m...)
-	return VerifySingleSignature(curve, pubKey, msg, sig)
+// DistinctMsgVerifySingleSignature checks that a single 'Distinct Message' signature is valid
+func DistinctMsgVerifySingleSignature(curve CurveSystem, pubkey Point, m []byte, sig Point) bool {
+	msg := append(pubkey.MarshalUncompressed(), m...)
+	return VerifySingleSignature(curve, pubkey, msg, sig)
 }
 
-func VerifyAggregateDistinctMsg(curve CurveSystem, aggsig Point, keys []Point, msgs [][]byte) bool {
+// DistinctMsgVerifyAggregateSignature checks that an aggsig was generated from the
+// the provided set of public key / msg pairs, when the messages are signed using
+// the 'Distinct Message' method.
+func DistinctMsgVerifyAggregateSignature(curve CurveSystem, aggsig Point, keys []Point, msgs [][]byte) bool {
 	if len(keys) != len(msgs) {
 		return false
 	}
