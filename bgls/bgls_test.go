@@ -22,12 +22,14 @@ func TestSingleSigner(t *testing.T) {
 		_, err = rand.Read(d)
 		assert.Nil(t, err, "test data generation failed")
 		sig := Sign(curve, sk, d)
-		assert.True(t, VerifySingleSignature(curve, vk, d, sig), "Point1 verification failed")
+		assert.True(t, VerifySingleSignature(curve, sig, vk, d), "Standard BLS "+
+			"signature verification failed")
 
 		sigTmp := sig.Copy()
 		sigTmp, _ = sigTmp.Add(curve.GetG1())
 		sig2 := sigTmp
-		assert.False(t, VerifySingleSignature(curve, vk, d, sig2), "Point1 verification succeeding when it shouldn't")
+		assert.False(t, VerifySingleSignature(curve, sig2, vk, d), "Standard BLS "+
+			"signature verification succeeding when it shouldn't")
 
 		// TODO Add tests to show that this doesn't succeed if d or vk is altered
 	}
@@ -48,7 +50,7 @@ func TestAggregation(t *testing.T) {
 			pubkeys[i] = vk
 			sigs[i] = sig
 		}
-		aggSig := AggregatePoints(sigs[:N])
+		aggSig := AggregateSignatures(sigs[:N])
 		assert.True(t, VerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N]),
 			"Aggregate Point1 verification failed")
 		assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys[:N-1], msgs[:N]),
@@ -57,7 +59,7 @@ func TestAggregation(t *testing.T) {
 		pubkeys[N] = vkf
 		sigs[N] = Sign(curve, skf, msgs[0])
 		msgs[N] = msgs[0]
-		aggSig = AggregatePoints(sigs)
+		aggSig = AggregateSignatures(sigs)
 		assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys, msgs),
 			"Aggregate Signature succeeding with duplicate messages")
 		assert.True(t, KoskVerifyAggregateSignature(curve, aggSig, pubkeys, msgs),
@@ -66,7 +68,7 @@ func TestAggregation(t *testing.T) {
 			"Aggregate Point1 succeeding with invalid signature")
 		msgs[0] = msgs[1]
 		msgs[1] = msgs[N]
-		aggSig = AggregatePoints(sigs[:N])
+		aggSig = AggregateSignatures(sigs[:N])
 		assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N]),
 			"Aggregate Point1 succeeded with messages 0 and 1 switched")
 
@@ -122,7 +124,7 @@ func BenchmarkVerification(b *testing.B) {
 	sig := Sign(curve, sk, message)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if !VerifySingleSignature(curve, vk, message, sig) {
+		if !VerifySingleSignature(curve, sig, vk, message) {
 			b.Error("verification failed")
 		}
 	}
@@ -134,7 +136,7 @@ var msg []byte
 
 func benchmulti(b *testing.B, k int) {
 	curve := Altbn128
-	multisig := MultiSig{vks[:k], AggregatePoints(sgs[:k]), msg}
+	multisig := MultiSig{vks[:k], AggregateSignatures(sgs[:k]), msg}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if !multisig.Verify(curve) {
@@ -179,7 +181,7 @@ func BenchmarkAggregateVerification(b *testing.B) {
 		verifkeys[i] = vk
 		sigs[i] = Sign(curve, sk, messages[i])
 	}
-	aggsig := AggSig{verifkeys, messages, AggregatePoints(sigs)}
+	aggsig := AggSig{verifkeys, messages, AggregateSignatures(sigs)}
 	b.ResetTimer()
 	if !aggsig.Verify(curve) {
 		b.Error("Aggregate verificaton failed")

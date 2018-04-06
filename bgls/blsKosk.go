@@ -65,7 +65,7 @@ func CheckAuthentication(curve CurveSystem, pubkey Point, authentication Point) 
 func CheckAuthenticationCustHash(curve CurveSystem, pubkey Point, authentication Point, hash func([]byte) Point) bool {
 	msg := pubkey.Marshal()
 	msg = append(make([]byte, 1), msg...)
-	return VerifySingleSignatureCustHash(curve, pubkey, msg, authentication, hash)
+	return VerifySingleSignatureCustHash(curve, authentication, pubkey, msg, hash)
 }
 
 // KoskSign creates a kosk signature on a message with a private key.
@@ -83,7 +83,7 @@ func KoskSignCustHash(curve CurveSystem, sk *big.Int, msg []byte, hash func([]by
 }
 
 // KoskVerifySingleSignature checks that a single kosk signature is valid.
-func KoskVerifySingleSignature(curve CurveSystem, pubKey Point, msg []byte, sig Point) bool {
+func KoskVerifySingleSignature(curve CurveSystem, sig Point, pubKey Point, msg []byte) bool {
 	return KoskVerifySingleSignatureCustHash(curve, pubKey, msg, sig, curve.HashToG1)
 }
 
@@ -92,7 +92,7 @@ func KoskVerifySingleSignature(curve CurveSystem, pubKey Point, msg []byte, sig 
 func KoskVerifySingleSignatureCustHash(curve CurveSystem, pubKey Point, msg []byte,
 	sig Point, hash func([]byte) Point) bool {
 	m := append([]byte{1}, msg...)
-	return VerifySingleSignature(curve, pubKey, m, sig)
+	return VerifySingleSignature(curve, sig, pubKey, m)
 }
 
 // KoskVerifyAggregateSignature verifies that the aggregated signature proves

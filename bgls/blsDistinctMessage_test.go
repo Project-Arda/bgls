@@ -15,16 +15,15 @@ func TestDistinctMsgSingleSigner(t *testing.T) {
 	for _, curve := range curves {
 		sk, vk, err := KeyGen(curve)
 		assert.Nil(t, err, "Key generation failed")
-		d := make([]byte, 64)
-		_, err = rand.Read(d)
+		msg := make([]byte, 64)
+		_, err = rand.Read(msg)
 		assert.Nil(t, err, "test data generation failed")
-		sig := DistinctMsgSign(curve, sk, d)
-		assert.True(t, DistinctMsgVerifySingleSignature(curve, vk, d, sig), "Point1 verification failed")
+		sig := DistinctMsgSign(curve, sk, msg)
+		assert.True(t, DistinctMsgVerifySingleSignature(curve, sig, vk, msg), "Point1 verification failed")
 
-		sigTmp := sig.Copy()
-		sigTmp, _ = sigTmp.Add(curve.GetG1())
-		sig2 := sigTmp
-		assert.False(t, DistinctMsgVerifySingleSignature(curve, vk, d, sig2), "Point1 verification succeeding when it shouldn't")
+		sig2 := sig.Copy()
+		sig2, _ = sig2.Add(curve.GetG1())
+		assert.False(t, DistinctMsgVerifySingleSignature(curve, sig2, vk, msg), "Point1 verification succeeding when it shouldn't")
 	}
 }
 

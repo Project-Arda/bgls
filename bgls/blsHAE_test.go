@@ -31,6 +31,9 @@ func TestAggregationWithHAE(t *testing.T) {
 			"Aggregate Point1 verification failed")
 		assert.False(t, VerifyAggregateSignatureWithHAE(curve, aggSig, pubkeys[:N-1], msgs[:N]),
 			"Aggregate Point1 verification succeeding without enough pubkeys")
+		assert.Nil(t, AggregateSignaturesWithHAE(sigs[:N], pubkeys[:N-1]),
+			"Aggregation of signatures succeeding with differing numbers of signatures"+
+				" and pubkeys")
 		skf, vkf, _ := KeyGen(curve)
 		pubkeys[N] = vkf
 		msgs[N] = msgs[0]
