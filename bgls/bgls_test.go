@@ -64,8 +64,6 @@ func TestAggregation(t *testing.T) {
 		aggSig = AggregateSignatures(sigs)
 		assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys, msgs),
 			"Aggregate Signature succeeding with duplicate messages")
-		assert.True(t, KoskVerifyAggregateSignature(curve, aggSig, pubkeys, msgs),
-			"Aggregate Kosk signature failing with duplicate messages")
 		assert.False(t, VerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N]),
 			"Aggregate Point1 succeeding with invalid signature")
 		msgs[0] = msgs[1]

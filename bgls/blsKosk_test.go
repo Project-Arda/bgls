@@ -92,3 +92,42 @@ func TestKoskMultiSigWithMultiplicity(t *testing.T) {
 		}
 	}
 }
+
+func TestKoskAggregation(t *testing.T) {
+	for _, curve := range curves {
+		N, Size := 6, 32
+		msgs := make([][]byte, N+1)
+		sigs := make([]Point, N+1)
+		pubkeys := make([]Point, N+1)
+		for i := 0; i < N; i++ {
+			msgs[i] = make([]byte, Size)
+			rand.Read(msgs[i])
+
+			sk, vk, _ := KeyGen(curve)
+			sig := KoskSign(curve, sk, msgs[i])
+			pubkeys[i] = vk
+			sigs[i] = sig
+		}
+		aggSig := AggregateSignatures(sigs[:N])
+		assert.True(t, KoskVerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N]),
+			"Aggregate Point verification failed")
+		assert.False(t, KoskVerifyAggregateSignature(curve, aggSig, pubkeys[:N-1], msgs[:N]),
+			"Aggregate Point verification succeeding without enough pubkeys")
+		skf, vkf, _ := KeyGen(curve)
+		pubkeys[N] = vkf
+		sigs[N] = KoskSign(curve, skf, msgs[0])
+		msgs[N] = msgs[0]
+		aggSig = AggregateSignatures(sigs)
+		assert.True(t, KoskVerifyAggregateSignature(curve, aggSig, pubkeys, msgs),
+			"Aggregate Signature failing with duplicate messages")
+		assert.False(t, KoskVerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N]),
+			"Aggregate Point succeeding with invalid signature")
+		msgs[0] = msgs[1]
+		msgs[1] = msgs[N]
+		aggSig = AggregateSignatures(sigs[:N])
+		assert.False(t, KoskVerifyAggregateSignature(curve, aggSig, pubkeys[:N], msgs[:N]),
+			"Aggregate Point1 succeeded with messages 0 and 1 switched")
+
+		// TODO Add tests to make sure there is no mutation
+	}
+}

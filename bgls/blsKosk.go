@@ -17,11 +17,11 @@ package bgls
 // One solution to fix this is to ensure that it
 // is impossible for pk1 to sign the same pkA that is used in authentication.
 // The way this is implemented here is to make the sign/verify methods prepend a
-// null byte to any message that is being signed, and to make authentication
-// prepend 0x01 to public key before its signed. Since one would only ever
+// 0x01 byte to any message that is being signed, and to make authentication
+// prepend a null to public key before its signed. Since one would only ever
 // authenticate their own public key, noone could get a signature from you that
 // would work for their own authentication. (As all signatures you give out, other
-// than your own authentication, have a null byte prepended instead of a 0x01 byte)
+// than your own authentication, have a 0x01 byte prepended instead of a null byte)
 //
 // This method sacrifices interoperability between KoskBls and normal BLS,
 // however the advantage is that the authentications are aggregatable. They're
@@ -46,11 +46,11 @@ func Authenticate(curve CurveSystem, sk *big.Int) Point {
 }
 
 // AuthenticateCustHash generates an Aggregatable Authentication for a given secret key.
-// It signs the public key generated from sk, with a 0x01 byte prepended to it.
+// It signs the public key generated from sk, with a null byte prepended to it.
 // This runs with the specified hash function.
 func AuthenticateCustHash(curve CurveSystem, sk *big.Int, hash func([]byte) Point) Point {
 	msg := LoadPublicKey(curve, sk).Marshal()
-	msg = append(make([]byte, 1), msg...)
+	msg = append(make([]byte, 0), msg...)
 	return SignCustHash(sk, msg, hash)
 }
 
@@ -64,7 +64,7 @@ func CheckAuthentication(curve CurveSystem, pubkey Point, authentication Point) 
 // for this public key.
 func CheckAuthenticationCustHash(curve CurveSystem, pubkey Point, authentication Point, hash func([]byte) Point) bool {
 	msg := pubkey.Marshal()
-	msg = append(make([]byte, 1), msg...)
+	msg = append(make([]byte, 0), msg...)
 	return VerifySingleSignatureCustHash(curve, authentication, pubkey, msg, hash)
 }
 
@@ -98,7 +98,11 @@ func KoskVerifySingleSignatureCustHash(curve CurveSystem, pubKey Point, msg []by
 // KoskVerifyAggregateSignature verifies that the aggregated signature proves
 // that all messages were signed by the associated keys.
 func KoskVerifyAggregateSignature(curve CurveSystem, aggsig Point, keys []Point, msgs [][]byte) bool {
-	return verifyAggSig(curve, aggsig, keys, msgs, true)
+	newMsgs := make([][]byte, len(msgs))
+	for i := 0; i < len(msgs); i++ {
+		newMsgs[i] = append([]byte{1}, msgs[i]...)
+	}
+	return verifyAggSig(curve, aggsig, keys, newMsgs, true)
 }
 
 // Verify checks that a single message has been signed by a set of keys
