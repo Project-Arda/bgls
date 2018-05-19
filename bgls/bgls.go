@@ -25,7 +25,8 @@ type AggSig struct {
 	sig  Point
 }
 
-//KeyGen generates a *big.Int and Point2
+// KeyGen generates a private / public key pair. The private key is a big int,
+// and the the public key is on G2.
 func KeyGen(curve CurveSystem) (*big.Int, Point, error) {
 	x, err := rand.Int(rand.Reader, curve.GetG1Order())
 	if err != nil {
@@ -35,7 +36,7 @@ func KeyGen(curve CurveSystem) (*big.Int, Point, error) {
 	return x, pubKey, nil
 }
 
-//LoadPublicKey turns secret key into a public key of type Point2
+// LoadPublicKey turns secret key into a public key of type Point2
 func LoadPublicKey(curve CurveSystem, sk *big.Int) Point {
 	pubKey := curve.GetG2().Mul(sk)
 	return pubKey
