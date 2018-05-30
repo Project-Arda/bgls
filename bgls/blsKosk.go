@@ -119,6 +119,19 @@ func KoskVerifyMultiSignature(curve CurveSystem, aggsig Point, keys []Point, msg
 	return verifyMultiSignature(curve, aggsig, keys, msg2)
 }
 
+// KoskVerifyBatchMultiSignature checks that the set of aggregate signatures correctly proves
+// that a set of messages has the correct associated pubkey.
+// vulnerable against chosen key attack, if keys have not been authenticated
+// This is faster than verifying each multisignature individually.
+func KoskVerifyBatchMultiSignature(curve CurveSystem, aggsigs []Point, pubkeys [][]Point, msgs [][]byte) bool {
+	aggsig := AggregateSignatures(aggsigs)
+	keys := make([]Point, len(pubkeys), len(pubkeys))
+	for i := 0; i < len(pubkeys); i++ {
+		keys[i] = AggregateKeys(pubkeys[i])
+	}
+	return KoskVerifyAggregateSignature(curve, aggsig, keys, msgs)
+}
+
 // KoskVerifyMultiSignatureWithMultiplicity verifies a BLS multi signature where
 // multiple copies of each signature may have been included in the aggregation
 func KoskVerifyMultiSignatureWithMultiplicity(curve CurveSystem, aggsig Point, keys []Point,
