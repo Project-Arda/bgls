@@ -25,6 +25,7 @@ package bgls
 // VerifyMultiSignatureWithHAE, VerifyAggregateSignatureWithHAE
 
 import (
+	"crypto/rand"
 	"math/big"
 
 	"golang.org/x/crypto/blake2b"
@@ -53,12 +54,29 @@ func VerifyAggregateSignatureWithHAE(curve CurveSystem, aggsig Point, pubkeys []
 
 // VerifyMultiSignatureWithHAE verifies signatures of the same message aggregated with HAE.
 func VerifyMultiSignatureWithHAE(curve CurveSystem, aggsig Point, pubkeys []Point, msg []byte) bool {
-	t := hashPubKeysToExponents(pubkeys)
-	newkeys := ScalePoints(pubkeys, t)
-	return verifyMultiSignature(curve, aggsig, newkeys, msg)
+	return VerifySingleSignature(curve, aggsig, getAggregatePubKey(curve, pubkeys), msg)
 }
 
-// My hash from G^n \to \R^n is using blake2x. The inputs to the hash are the
+// VerifyBatchMultiSignatureWithHAE verifies multiple MultiSignatures
+// are valid, in time faster than verifying each multisignature individually.
+func VerifyBatchMultiSignatureWithHAE(curve CurveSystem, aggsigs []Point, aggpubkeys []Point, msgs [][]byte, allowDups bool) bool {
+	if allowDups {
+		t := make([]*big.Int, len(aggsigs), len(aggsigs))
+		for i := 0; i < len(aggsigs); i++ {
+			t[i], _ = rand.Int(rand.Reader, curve.GetG1Order())
+		}
+		ScalePoints(aggsigs, t)
+	}
+	aggsig := AggregateSignatures(aggsigs)
+	return verifyAggSig(curve, aggsig, aggpubkeys, msgs, true)
+}
+
+func getAggregatePubKey(curve CurveSystem, pubkeys []Point) Point {
+	t := hashPubKeysToExponents(pubkeys)
+	return AggregatePoints(ScalePoints(pubkeys, t))
+}
+
+// This hash from G^n \to \R^n is using blake2x. The inputs to the hash are the
 // uncompressed marshal's of each of the pubkeys.
 func hashPubKeysToExponents(pubkeys []Point) []*big.Int {
 	hashFunc, _ := blake2b.NewXOF(uint32(16*len(pubkeys)), []byte{})

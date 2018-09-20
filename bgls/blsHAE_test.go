@@ -13,7 +13,7 @@ import (
 
 func TestAggregationWithHAE(t *testing.T) {
 	for _, curve := range curves {
-		N, Size := 6, 32
+		N, Size := 5, 32
 		msgs := make([][]byte, N+1)
 		sigs := make([]Point, N+1)
 		pubkeys := make([]Point, N+1)
@@ -55,7 +55,7 @@ func TestAggregationWithHAE(t *testing.T) {
 
 func TestMultiSigWithHAE(t *testing.T) {
 	for _, curve := range curves {
-		Tests, Size, Signers := 5, 32, 10
+		Tests, Size, Signers := 5, 32, 8
 		for i := 0; i < Tests; i++ {
 			msg := make([]byte, Size)
 			rand.Read(msg)
